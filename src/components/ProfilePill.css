@@ -1,0 +1,50 @@
+.ppill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  max-width: 100%;
+}
+.ppill__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--pp-surface-2);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.ppill__text { display: flex; flex-direction: column; min-width: 0; }
+.ppill__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pp-text);
+  line-height: 1.1;
+}
+.ppill__team-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.ppill__team-code {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pp-text-muted);
+}
+.ppill__archetype {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--pp-text-faint);
+  line-height: 1.1;
+  margin-top: 2px;
+  text-transform: uppercase;
+}

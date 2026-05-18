@@ -1,0 +1,80 @@
+.simctl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.simctl--demo {
+  padding: 18px 22px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-lg);
+  max-width: 320px;
+  text-align: center;
+}
+
+.simctl--inline {
+  padding: 10px 16px 16px;
+}
+
+.simctl__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+}
+.simctl__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px var(--pp-accent);
+}
+
+.simctl__btns {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.simctl__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background var(--pp-d-fast) var(--pp-ease), opacity var(--pp-d-fast) var(--pp-ease);
+}
+.simctl__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.simctl__btn--primary {
+  background: var(--pp-accent);
+  border-color: var(--pp-accent);
+  color: white;
+}
+.simctl__btn--ghost {
+  background: transparent;
+  color: var(--pp-text-muted);
+}
+
+.simctl__hint {
+  font-size: 11px;
+  color: var(--pp-text-faint);
+  line-height: 1.4;
+  max-width: 260px;
+}

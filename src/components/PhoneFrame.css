@@ -1,0 +1,165 @@
+/* Phone chrome — iPhone 14 Pro-ish proportions. Spec §8.2.
+
+   The frame is rendered at its true logical pixel size (390×844). When the
+   viewport is too small for that to fit naturally, we scale the whole device
+   down proportionally so it always fits on screen for the /demo desktop view
+   without authoring two layouts.
+*/
+
+.ppfr-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 8px;
+}
+
+/* Label chip above the phone (demo only) */
+.ppfr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ppfr-chip__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px var(--pp-accent);
+}
+.ppfr-chip__label { color: var(--pp-text); font-weight: 600; letter-spacing: 0.06em; }
+.ppfr-chip__sub   { color: var(--pp-text-faint); }
+
+/* Device + bezel — outer rounded black border around the screen */
+.ppfr-device {
+  position: relative;
+  width: calc(var(--pp-phone-w) + var(--pp-phone-bezel) * 2);
+  height: calc(var(--pp-phone-h) + var(--pp-phone-bezel) * 2);
+}
+.ppfr-bezel {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  border-radius: calc(var(--pp-phone-radius) + var(--pp-phone-bezel));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 24px 48px -8px rgba(0, 0, 0, 0.6),
+    0 36px 80px -24px rgba(225, 14, 31, 0.18);
+  padding: var(--pp-phone-bezel);
+}
+.ppfr-screen {
+  position: relative;
+  width: var(--pp-phone-w);
+  height: var(--pp-phone-h);
+  border-radius: var(--pp-phone-radius);
+  background: var(--pp-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Status bar — fixed, 44px, with Dynamic-Island-style pill */
+.ppfr-statusbar {
+  position: relative;
+  height: var(--pp-phone-statusbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  color: var(--pp-text);
+  font-weight: 600;
+  font-size: 15px;
+  z-index: 2;
+}
+.ppfr-statusbar__time {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  width: 56px;
+  text-align: left;
+}
+.ppfr-statusbar__dynamic-island {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 32px;
+  background: #000;
+  border-radius: 999px;
+  z-index: 3;
+}
+.ppfr-statusbar__icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 56px;
+  justify-content: flex-end;
+}
+
+/* Content fills the remaining height. The 34px home-indicator safe area is
+   reserved by .ppfr-homebar below; content can use `padding-bottom: env(...)`
+   when it needs to clear the indicator on a real device. */
+.ppfr-content {
+  position: relative;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.ppfr-content::-webkit-scrollbar { display: none; }
+
+.ppfr-homebar {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Side hardware buttons (cosmetic only) */
+.ppfr-sidebtn {
+  position: absolute;
+  background: #0a0a0a;
+  border-radius: 1.5px;
+}
+.ppfr-sidebtn--silent  { left: -3px; top: 100px; width: 3px;  height: 28px; }
+.ppfr-sidebtn--vol-up  { left: -3px; top: 145px; width: 3px;  height: 50px; }
+.ppfr-sidebtn--vol-down{ left: -3px; top: 205px; width: 3px;  height: 50px; }
+.ppfr-sidebtn--power   { right: -3px; top: 165px; width: 3px; height: 70px; }
+
+/* Auto-scale on smaller viewports so phone always fits without re-layout */
+@media (max-height: 920px) {
+  .ppfr-wrap { transform: scale(0.92); transform-origin: center top; }
+}
+@media (max-height: 820px) {
+  .ppfr-wrap { transform: scale(0.82); }
+}
+@media (max-height: 720px) {
+  .ppfr-wrap { transform: scale(0.74); }
+}
+
+/* ── ?frame=off: render raw at native size, no chrome ─────────────────────── */
+.ppfr-raw {
+  width: 100vw;
+  min-height: 100vh;
+  max-width: var(--pp-phone-w);
+  margin: 0 auto;
+  background: var(--pp-bg);
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}

@@ -1,0 +1,149 @@
+.feed {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 16px 8px;
+  position: relative;
+  transition: background var(--pp-d-med) var(--pp-ease);
+}
+.feed--flash::before {
+  /* Goal celebration shimmer — full-bleed inside the phone */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(225, 14, 31, 0.28), transparent 65%);
+  animation: feed-flash 1.8s var(--pp-ease) forwards;
+  pointer-events: none;
+}
+@keyframes feed-flash {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.feed__h {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+  padding: 0 4px 8px;
+}
+.feed__list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.feed__list::-webkit-scrollbar { display: none; }
+
+.feed__empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--pp-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 24px;
+}
+.feed__empty-sub {
+  font-size: 11px;
+  color: var(--pp-text-faint);
+}
+
+.feed__row {
+  display: grid;
+  grid-template-columns: 40px 28px 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-md);
+  animation: feed-enter 280ms var(--pp-ease) both;
+}
+@keyframes feed-enter {
+  0%   { opacity: 0; transform: translateY(-6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.feed__time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+  letter-spacing: 0.02em;
+  padding-top: 1px;
+}
+.feed__icon {
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+}
+.feed__body { min-width: 0; }
+.feed__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pp-text);
+  line-height: 1.3;
+}
+.feed__team {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.feed__sub {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+  margin-top: 2px;
+}
+
+/* Variants ----------------------------------------------------------------- */
+
+.feed__row--goal {
+  border-color: var(--pp-accent-soft);
+  background:
+    linear-gradient(180deg, rgba(225, 14, 31, 0.14), rgba(225, 14, 31, 0.02)),
+    var(--pp-surface);
+  box-shadow: 0 0 0 1px rgba(225, 14, 31, 0.18);
+}
+.feed__row--goal.is-mine {
+  /* Slightly louder when viewer's favorite team scores */
+  box-shadow: 0 0 0 1px var(--pp-accent), 0 0 24px -8px var(--pp-accent);
+}
+
+.feed__row--card {
+  background: var(--pp-surface);
+}
+.feed__card {
+  display: inline-block;
+  width: 16px;
+  height: 22px;
+  border-radius: 2px;
+  margin: 0 auto;
+  align-self: center;
+}
+.feed__card--yellow { background: var(--pp-card-yellow); }
+.feed__card--red    { background: var(--pp-card-red); }
+
+.feed__row--whistle {
+  background: var(--pp-surface-2);
+  border-color: var(--pp-border-strong);
+}
+.feed__row--ft {
+  background:
+    linear-gradient(180deg, rgba(46, 204, 113, 0.18), rgba(46, 204, 113, 0.02)),
+    var(--pp-surface-2);
+  border-color: rgba(46, 204, 113, 0.32);
+}
+
+.feed__row--kickoff {
+  background: var(--pp-surface);
+  opacity: 0.78;
+}

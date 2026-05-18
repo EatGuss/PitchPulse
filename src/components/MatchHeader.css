@@ -1,0 +1,107 @@
+.mhdr {
+  padding: 14px 20px 18px;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(225, 14, 31, 0.16), transparent 70%),
+    var(--pp-surface);
+  border-bottom: 1px solid var(--pp-border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mhdr__crumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pp-text-muted);
+}
+.mhdr__dot { color: var(--pp-text-faint); }
+
+.mhdr__scorecard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.mhdr__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.mhdr__team-code {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.mhdr__team-name {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+}
+
+.mhdr__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--pp-text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  min-width: 90px;
+  justify-content: center;
+}
+.mhdr__score-sep {
+  color: var(--pp-text-faint);
+  font-weight: 500;
+  font-size: 26px;
+}
+
+.mhdr__clockbar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--pp-bg);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  align-self: center;
+}
+.mhdr__livedot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pp-text-faint);
+  transition: background var(--pp-d-fast) var(--pp-ease);
+}
+.mhdr__livedot.is-live {
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px var(--pp-accent);
+  animation: pulse-live 1.6s ease-in-out infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.mhdr__clock {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pp-text);
+  letter-spacing: 0.02em;
+}
+.mhdr__phase {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+}

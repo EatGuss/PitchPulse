@@ -1,0 +1,34 @@
+{
+  "name": "pitchpulse",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Real-time social Bundesliga matchday companion — DFL Fan Squad hackathon submission.",
+  "scripts": {
+    "parse": "tsx scripts/parse-match-xml.ts",
+    "predev": "npm run parse",
+    "prebuild": "npm run parse",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
+    "verify": "tsx scripts/verify-payouts.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "eslint": "^9.12.0",
+    "fast-xml-parser": "^4.5.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}

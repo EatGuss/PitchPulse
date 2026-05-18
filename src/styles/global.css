@@ -1,0 +1,81 @@
+@import './tokens.css';
+
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+  font-family: var(--pp-font-sans);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Honor mobile safe areas when running on real devices */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* Allow horizontal centering of the phone frame on desktop demos */
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body {
+  /* Subtle gradient backdrop only shows behind phone chrome on desktop */
+  background:
+    radial-gradient(1100px 600px at 50% -10%, rgba(225, 14, 31, 0.08), transparent 60%),
+    var(--pp-bg);
+  background-attachment: fixed;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* Headings reset — pages opt back in via class names */
+h1, h2, h3, h4, h5, h6, p {
+  margin: 0;
+}
+
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Disable hover-only affordances on touch devices (mobile-first per spec).
+   Keep them subtle on desktop for the /demo screen. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+}
+
+/* Press-state micro-animation per spec §8.2 (button scale 0.96, 120ms ease-out) */
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition: transform var(--pp-d-fast) var(--pp-ease);
+}

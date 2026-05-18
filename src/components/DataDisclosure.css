@@ -1,0 +1,69 @@
+.disc {
+  color: var(--pp-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+.disc__badge {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--pp-surface-2);
+  color: var(--pp-text-muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 700;
+  font-family: Georgia, 'Times New Roman', serif;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border: 1px solid var(--pp-border-strong);
+}
+
+.disc__copy strong {
+  color: var(--pp-text);
+  font-weight: 600;
+}
+
+/* Footer variant — full-width subtle line beneath /demo stage */
+.disc--footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 12px 18px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-md);
+}
+
+/* Card variant — for the Gate 5 onboarding modal */
+.disc--card {
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-r-md);
+  padding: 14px 16px;
+}
+.disc__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pp-text);
+  margin: 0 0 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.disc__body { margin: 0; }
+
+/* Inline variant — pill */
+.disc--inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px 4px 8px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  margin: 0;
+}
