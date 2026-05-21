@@ -1,0 +1,169 @@
+# PitchPulse — AppSync GraphQL schema
+#
+# Real-time multiplayer pipeline. Mutations are the broadcast points; matching
+# subscriptions fan out via @aws_subscribe over pure WebSockets (Amplify SDK
+# default). Auth: IAM via Cognito Identity Pool (unauthenticated role) for the
+# client; server-side Lambdas use their execution role's IAM credentials.
+#
+# Each subscription takes a matchId argument so clients can filter to the
+# single global room (MVP has one match — DFL-MAT-000001).
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+# ─── Match clock + events (Pillar 2: real-time data) ─────────────────────────
+
+type MatchClock @aws_iam {
+  matchId: ID!
+  matchMinute: Float!
+  displayClock: String!
+  phase: String!
+  scoreHome: Int!
+  scoreGuest: Int!
+  isRunning: Boolean!
+  updatedAt: AWSTimestamp!
+}
+
+type MatchEvent @aws_iam {
+  matchId: ID!
+  seq: Int!
+  id: ID!
+  type: String!
+  matchMinute: Float!
+  displayMinute: String!
+  matchPhase: String!
+  teamId: String
+  playerId: String
+  assistPlayerId: String
+  cardColor: String
+  reason: String
+  scoreHome: Int
+  scoreGuest: Int
+  eventTimeIso: String
+}
+
+# ─── Watch room reactions (Pillar 1: multiplayer) ────────────────────────────
+
+type RoomReaction @aws_iam {
+  matchId: ID!
+  reactionId: ID!
+  userId: ID!
+  emoji: String!
+  ts: AWSTimestamp!
+}
+
+# ─── Vote + prompt broadcast (gamification persistence — Tier B in Gate 4) ───
+
+type Vote @aws_iam {
+  matchId: ID!
+  promptId: ID!
+  userId: ID!
+  optionId: String!
+  votedAt: AWSTimestamp!
+}
+
+# ─── Inputs ──────────────────────────────────────────────────────────────────
+
+input MatchClockInput {
+  matchId: ID!
+  matchMinute: Float!
+  displayClock: String!
+  phase: String!
+  scoreHome: Int!
+  scoreGuest: Int!
+  isRunning: Boolean!
+  updatedAt: AWSTimestamp!
+}
+
+input MatchEventInput {
+  matchId: ID!
+  seq: Int!
+  id: ID!
+  type: String!
+  matchMinute: Float!
+  displayMinute: String!
+  matchPhase: String!
+  teamId: String
+  playerId: String
+  assistPlayerId: String
+  cardColor: String
+  reason: String
+  scoreHome: Int
+  scoreGuest: Int
+  eventTimeIso: String
+}
+
+input FireReactionInput {
+  matchId: ID!
+  userId: ID!
+  emoji: String!
+}
+
+input SubmitVoteInput {
+  matchId: ID!
+  promptId: ID!
+  userId: ID!
+  optionId: String!
+}
+
+input StartMatchInput {
+  matchId: ID!
+}
+
+type StartMatchResult @aws_iam {
+  matchId: ID!
+  startedAtWallMs: AWSTimestamp!
+  isRunning: Boolean!
+}
+
+# ─── Queries (minimal — used to bootstrap a late-joining client) ─────────────
+
+type Query @aws_iam {
+  # Returns nothing for MVP — placeholder so the schema has at least one Query.
+  ping: String
+}
+
+# ─── Mutations ───────────────────────────────────────────────────────────────
+
+type Mutation @aws_iam {
+  # Client-callable: flip the match into the running state. The sim-emitter
+  # Lambda picks up the change on the next 2-second cron tick and starts
+  # writing events. Idempotent — calling again resets the timeline.
+  startMatch(input: StartMatchInput!): StartMatchResult
+
+  # Client-callable: write a reaction to the room. Lambda resolver persists
+  # to pp-rooms then returns the reaction — that return triggers the
+  # roomReaction subscription via @aws_subscribe.
+  fireReaction(input: FireReactionInput!): RoomReaction
+
+  # Client-callable: persist a vote to pp-prompts. Server-side validates the
+  # 30s window via the prompt META record. Returns the vote envelope.
+  submitVote(input: SubmitVoteInput!): Vote
+
+  # Server-only: invoked by stream-handler Lambda to broadcast match clock
+  # ticks. NONE data source — payload echoed back to fire the subscription.
+  publishMatchClock(input: MatchClockInput!): MatchClock
+
+  # Server-only: invoked by stream-handler Lambda to broadcast a single match
+  # event (goal, card, halfTime, etc).
+  publishMatchEvent(input: MatchEventInput!): MatchEvent
+}
+
+# ─── Subscriptions (all subscribers filter by matchId argument) ──────────────
+
+type Subscription @aws_iam {
+  matchClock(matchId: ID!): MatchClock
+    @aws_subscribe(mutations: ["publishMatchClock"])
+
+  matchEvent(matchId: ID!): MatchEvent
+    @aws_subscribe(mutations: ["publishMatchEvent"])
+
+  roomReaction(matchId: ID!): RoomReaction
+    @aws_subscribe(mutations: ["fireReaction"])
+
+  voteSubmitted(matchId: ID!): Vote
+    @aws_subscribe(mutations: ["submitVote"])
+}

@@ -147,3 +147,34 @@
   background: var(--pp-surface);
   opacity: 0.78;
 }
+
+/* Shots — on-target (saves) get a faintly warm wash; off-target (missed /
+   blocked) stay neutral so the eye still finds goals + saves first. */
+.feed__row--shot {
+  background: var(--pp-surface);
+}
+.feed__row--shot-on {
+  border-color: rgba(255, 200, 60, 0.42);
+  background:
+    linear-gradient(180deg, rgba(255, 200, 60, 0.10), rgba(255, 200, 60, 0.02)),
+    var(--pp-surface);
+}
+.feed__row--shot-off {
+  opacity: 0.82;
+}
+
+.feed__row--offside {
+  background: var(--pp-surface);
+  opacity: 0.86;
+}
+.feed__row--corner {
+  background: var(--pp-surface);
+  border-color: rgba(80, 160, 230, 0.32);
+  background:
+    linear-gradient(180deg, rgba(80, 160, 230, 0.08), rgba(80, 160, 230, 0.02)),
+    var(--pp-surface);
+}
+.feed__row--foul {
+  background: var(--pp-surface);
+  opacity: 0.78;
+}

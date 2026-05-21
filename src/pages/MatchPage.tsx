@@ -16,6 +16,10 @@ import { EventFeed } from '../components/EventFeed';
 import { SimControls } from '../components/SimControls';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { PromptSheet } from '../components/PromptSheet';
+import { Leaderboard } from '../components/Leaderboard';
+import { ReactionBar } from '../components/ReactionBar';
+import { ReactionStream } from '../components/ReactionStream';
+import { BadgeToast } from '../components/BadgeToast';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
@@ -58,6 +62,10 @@ export function MatchPage({ userId, hideSimControls = false }: MatchPageProps) {
     );
   }
 
+  // Reactions are gated to "match in progress" — pre-match the bar is dimmed
+  // so taps don't fire ghost reactions while alice/bob are still onboarding.
+  const reactionsDisabled = clock.phase === 'preMatch';
+
   return (
     <div className="mpage">
       <div className="mpage__topbar">
@@ -65,10 +73,14 @@ export function MatchPage({ userId, hideSimControls = false }: MatchPageProps) {
         <CoinBalance value={balance} />
       </div>
       <MatchHeader info={info} clock={clock} />
+      <Leaderboard viewerId={userId} />
       <EventFeed events={events} info={info} viewerId={userId} />
+      <ReactionBar viewerId={userId} disabled={reactionsDisabled} />
       {!hideSimControls && <SimControls variant="inline" />}
       <BottomTabBar active="match" />
+      <ReactionStream />
       <PromptSheet prompt={prompt} myPickedOptionId={myPickedOptionId} viewerId={userId} onVote={vote} />
+      <BadgeToast viewerId={userId} />
     </div>
   );
 }

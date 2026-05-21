@@ -279,9 +279,25 @@ function classify(ev: RawEvent): {
     case 'CornerKick':
       return { type: 'corner', payload: { teamId: String(child['@_Team'] ?? '') } };
     case 'Foul':
-      return { type: 'foul', payload: { teamId: String(child['@_Team'] ?? '') } };
+      // DFL XML attribute names on <Foul>: Fouler (player), TeamFouler (team),
+      // FoulType ("foul" | "handBall" | ...). Fouled / TeamFouled describe the
+      // victim and aren't displayed yet.
+      return {
+        type: 'foul',
+        payload: {
+          teamId: child['@_TeamFouler'] !== undefined ? String(child['@_TeamFouler']) : undefined,
+          playerId: child['@_Fouler'] !== undefined ? String(child['@_Fouler']) : undefined,
+          reason: child['@_FoulType'] !== undefined ? String(child['@_FoulType']) : undefined,
+        },
+      };
     case 'Offside':
-      return { type: 'offside', payload: { teamId: String(child['@_Team'] ?? '') } };
+      return {
+        type: 'offside',
+        payload: {
+          teamId: child['@_Team'] !== undefined ? String(child['@_Team']) : undefined,
+          playerId: child['@_Player'] !== undefined ? String(child['@_Player']) : undefined,
+        },
+      };
     case 'Penalty':
       // Penalty AWARDED but not yet taken / missed without ShotAtGoal child.
       // (Penalty-that-scored is handled above by the SuccessfulShot branch.)

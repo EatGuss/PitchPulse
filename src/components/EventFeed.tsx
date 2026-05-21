@@ -21,11 +21,46 @@ export interface EventFeedProps {
   viewerId: DemoUserId;
 }
 
-type DisplayableType = 'goal' | 'card' | 'halfTime' | 'fullTime' | 'kickOff';
-const DISPLAYABLE = new Set<DisplayableType>(['goal', 'card', 'halfTime', 'fullTime', 'kickOff']);
+type DisplayableType =
+  | 'goal'
+  | 'card'
+  | 'halfTime'
+  | 'fullTime'
+  | 'kickOff'
+  | 'shotMissed'
+  | 'shotBlocked'
+  | 'shotSaved'
+  | 'offside'
+  | 'corner'
+  | 'foul';
+const DISPLAYABLE = new Set<DisplayableType>([
+  'goal',
+  'card',
+  'halfTime',
+  'fullTime',
+  'kickOff',
+  'shotMissed',
+  'shotBlocked',
+  'shotSaved',
+  'offside',
+  'corner',
+  'foul',
+]);
 
 function isDisplayable(t: NormalizedEvent['type']): t is DisplayableType {
   return DISPLAYABLE.has(t as DisplayableType);
+}
+
+const FOUL_TYPE_LABEL: Record<string, string> = {
+  foul: 'Foul',
+  handBall: 'Handball',
+  pullingShirt: 'Shirt pull',
+  diving: 'Simulation',
+};
+
+function foulLabel(reason: string | undefined): string {
+  if (!reason) return 'Foul';
+  return FOUL_TYPE_LABEL[reason] ?? 'Foul';
 }
 
 function playerName(info: MatchInfo, playerId: string | undefined): string {
@@ -120,6 +155,95 @@ function FeedRow({ event, info, viewerId }: RowProps) {
           <div className="feed__body">
             <div className="feed__title">Kick-off</div>
             <div className="feed__sub">{event.matchPhase === 'secondHalf' ? 'Second half underway' : 'Match underway'}</div>
+          </div>
+        </li>
+      );
+    case 'shotSaved':
+      return (
+        <li className="feed__row feed__row--shot feed__row--shot-on">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">🧤</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+              {' '}Shot saved{player ? ` — ${player}` : ''}
+            </div>
+            <div className="feed__sub">Keeper denied it — on target</div>
+          </div>
+        </li>
+      );
+    case 'shotMissed':
+      return (
+        <li className="feed__row feed__row--shot feed__row--shot-off">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">🎯</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+              {' '}Shot off target{player ? ` — ${player}` : ''}
+            </div>
+            <div className="feed__sub">Wide of the post</div>
+          </div>
+        </li>
+      );
+    case 'shotBlocked':
+      return (
+        <li className="feed__row feed__row--shot feed__row--shot-off">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">🛡</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+              {' '}Shot blocked{player ? ` — ${player}` : ''}
+            </div>
+            <div className="feed__sub">Defender in the way</div>
+          </div>
+        </li>
+      );
+    case 'offside':
+      return (
+        <li className="feed__row feed__row--offside">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">🚩</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+              {' '}Offside{player ? ` — ${player}` : ''}
+            </div>
+            <div className="feed__sub">Flag's up</div>
+          </div>
+        </li>
+      );
+    case 'corner':
+      return (
+        <li className="feed__row feed__row--corner">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">⛳</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+              {' '}Corner kick
+            </div>
+            <div className="feed__sub">Set piece chance</div>
+          </div>
+        </li>
+      );
+    case 'foul':
+      return (
+        <li className="feed__row feed__row--foul">
+          <span className="feed__time tabular">{event.displayMinute}</span>
+          <span className="feed__icon" aria-hidden="true">✋</span>
+          <div className="feed__body">
+            <div className="feed__title">
+              {event.teamId ? (
+                <>
+                  <span className="feed__team" style={{ color: team.accent }}>{team.code}</span>
+                  {' '}
+                </>
+              ) : null}
+              {foulLabel(event.reason)}{player ? ` — ${player}` : ''}
+            </div>
+            <div className="feed__sub">Free kick awarded</div>
           </div>
         </li>
       );

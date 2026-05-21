@@ -158,6 +158,19 @@ vite.config.ts.timestamp-*
 cdk.out/
 *.cdk.staging/
 
+# AWS CDK deploy outputs — contains AppSync API key + Identity Pool ID.
+# Anything beyond endpoint URLs is sandbox-scoped and tied to temp creds, but
+# treat as secret. Re-generate via `cdk deploy --outputs-file cdk-outputs.json`.
+/cdk/cdk-outputs.json
+cdk/cdk-outputs.json
+
+# Local Lambda invocation fixtures (created by `aws lambda invoke`).
+/cdk/start-match-payload.json
+/cdk/start-match-response.json
+cdk/start-match-payload.json
+cdk/start-match-response.json
+cdk/out.json
+
 # AWS SAM build artifacts (in case of future use)
 .aws-sam/
 

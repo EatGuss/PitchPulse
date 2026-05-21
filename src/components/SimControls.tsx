@@ -8,6 +8,8 @@
 
 import { useEffect, useState } from 'react';
 import { getMatchSim } from '../sim/matchSim';
+import { isAwsMode } from '../aws/config';
+import { awsStartMatch } from '../aws/bridge';
 import type { MatchClockState } from '../domain/types';
 import './SimControls.css';
 
@@ -19,17 +21,35 @@ export interface SimControlsProps {
 export function SimControls({ variant = 'inline' }: SimControlsProps) {
   const sim = getMatchSim();
   const [clock, setClock] = useState<MatchClockState>(sim.getState());
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     return sim.bus.on('clock', setClock);
   }, [sim]);
 
-  const onStart = () => sim.start();
+  const onStart = async () => {
+    if (isAwsMode) {
+      // AWS mode: the server-side sim-emitter Lambda owns the timeline.
+      // Pause/reset on the client are local conveniences only — the source
+      // of truth lives in DynamoDB CLOCK and is broadcast via AppSync.
+      setPending(true);
+      try {
+        await awsStartMatch();
+      } catch (err) {
+        console.error('[simctl] awsStartMatch failed', err);
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
+    sim.start();
+  };
+
   const onPause = () => sim.pause();
   const onReset = () => sim.reset();
 
-  const canStart = !clock.isRunning && clock.phase !== 'fullTime';
-  const canPause = clock.isRunning;
+  const canStart = !pending && !clock.isRunning && clock.phase !== 'fullTime';
+  const canPause = !isAwsMode && clock.isRunning;
 
   return (
     <div className={`simctl simctl--${variant}`} role="toolbar" aria-label="Match sim controls">

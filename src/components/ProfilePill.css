@@ -40,6 +40,24 @@
   letter-spacing: 0.04em;
   color: var(--pp-text-muted);
 }
+.ppill__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--pp-warning);
+  background: rgba(242, 201, 76, 0.16);
+  border-radius: 999px;
+  animation: ppill-streak-in 320ms var(--pp-ease) both;
+}
+@keyframes ppill-streak-in {
+  0%   { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}
 .ppill__archetype {
   font-size: 10px;
   letter-spacing: 0.04em;

@@ -36,7 +36,9 @@ import type { MatchClockState, MatchInfo, NormalizedEvent } from '../domain/type
  * for shorter windows during local dev/recording.
  */
 export const PROMPT_WINDOW_MS = (() => {
-  const raw = Number(import.meta.env.VITE_PROMPT_WINDOW_MS ?? 30_000);
+  // Cast via opt-typed view — see matchSim.ts for the headless-Node rationale.
+  const env = (import.meta as { env?: Partial<ImportMetaEnv> }).env;
+  const raw = Number(env?.VITE_PROMPT_WINDOW_MS ?? 30_000);
   return Number.isFinite(raw) && raw > 1000 ? raw : 30_000;
 })();
 export const PER_MATCH_PROMPT_CAP = 8;

@@ -1,0 +1,31 @@
+{
+  "name": "pitchpulse-cdk",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AWS CDK app for PitchPulse — Gate 4 of the DFL Fan Squad hackathon submission.",
+  "bin": {
+    "pitchpulse": "bin/pitchpulse.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval never",
+    "destroy": "cdk destroy --force"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.7.4",
+    "aws-cdk": "^2.1024.0",
+    "esbuild": "^0.24.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "aws-cdk-lib": "^2.225.0",
+    "constructs": "^10.4.2",
+    "fast-xml-parser": "^5.8.0"
+  }
+}

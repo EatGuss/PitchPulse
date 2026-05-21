@@ -1,0 +1,50 @@
+.rxbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 10px;
+  background: rgba(20, 26, 46, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--pp-border);
+}
+
+.rxbar__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pp-text-faint);
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 42px;
+}
+
+.rxbar__row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.rxbar__btn {
+  min-height: 44px;
+  border-radius: 14px;
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  transition: background var(--pp-d-fast) var(--pp-ease), border-color var(--pp-d-fast) var(--pp-ease);
+}
+.rxbar__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.rxbar__btn:not(:disabled):hover {
+  border-color: var(--pp-border-strong);
+}
+.rxbar__btn:not(:disabled):active {
+  background: var(--pp-surface-3);
+}

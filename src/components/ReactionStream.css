@@ -1,0 +1,65 @@
+.rxstream {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 15;
+}
+
+.rxstream__puff {
+  position: absolute;
+  bottom: 12%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: rxstream-rise 2200ms var(--pp-ease) forwards;
+  will-change: transform, opacity;
+}
+
+.rxstream__emoji {
+  font-size: 36px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+}
+
+.rxstream__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  background: rgba(11, 15, 31, 0.78);
+  border: 1px solid var(--rx-tint, var(--pp-border-strong));
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pp-text);
+  box-shadow: 0 0 12px -2px var(--rx-tint, transparent);
+  text-transform: uppercase;
+}
+
+.rxstream__avatar {
+  font-size: 12px;
+  line-height: 1;
+}
+
+@keyframes rxstream-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 30px) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -160px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -260px) scale(0.9);
+  }
+}

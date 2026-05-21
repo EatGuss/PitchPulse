@@ -1,0 +1,122 @@
+.lb {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px 10px;
+}
+
+.lb__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 2px;
+}
+.lb__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+}
+.lb__hint {
+  font-size: 10px;
+  color: var(--pp-text-faint);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lb__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lb__row {
+  display: grid;
+  grid-template-columns: 28px 22px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 8px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-md);
+  min-height: 40px;
+  transition:
+    background var(--pp-d-fast) var(--pp-ease),
+    border-color var(--pp-d-fast) var(--pp-ease),
+    order var(--pp-d-med) var(--pp-ease);
+}
+.lb__row.is-me {
+  border-color: var(--pp-accent);
+  box-shadow: 0 0 0 1px var(--pp-accent-soft);
+}
+
+.lb__rank {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--pp-text-muted);
+}
+.lb__row[data-rank='1'] .lb__rank { color: #F2C94C; }
+
+.lb__avatar {
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
+.lb__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text);
+}
+.lb__team-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lb-tint, var(--pp-text-faint));
+  flex-shrink: 0;
+}
+.lb__team-code {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pp-text-muted);
+}
+
+.lb__streak {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(242, 201, 76, 0.16);
+  color: var(--pp-warning);
+}
+
+.lb__coins {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pp-text);
+  letter-spacing: 0.01em;
+}
+.lb__coins-icon {
+  font-size: 9px;
+  color: var(--pp-warning);
+  align-self: center;
+  margin-right: 2px;
+}
+.lb__coins-suffix {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+  font-weight: 700;
+  margin-left: 1px;
+}

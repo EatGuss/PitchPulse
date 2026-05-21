@@ -9,6 +9,10 @@ import { useEffect, useState } from 'react';
 import type { MatchInfo } from '../domain/types';
 import { getMatchSim } from '../sim/matchSim';
 import { getPromptEngine } from '../sim/promptEngine';
+import { getWatchRoomEngine } from '../sim/watchRoomEngine';
+import { getBadgeEngine } from '../sim/badgeEngine';
+import { isAwsMode } from '../aws/config';
+import { attachAwsBridge } from '../aws/bridge';
 
 let cachedInfo: MatchInfo | null = null;
 let inflight: Promise<MatchInfo> | null = null;
@@ -44,9 +48,17 @@ export function useMatchData(): MatchDataState {
       try {
         const [info] = await Promise.all([loadMatchInfo(), getMatchSim().load()]);
         if (cancelled) return;
-        // Attach the PromptEngine to the live sim once info is known. Idempotent —
-        // attach() re-binds clean if called twice (both phone frames trigger this).
+        // Attach all engines once match info is known. Each attach() is
+        // idempotent — both phone frames mount this hook and that's safe.
+        // Order matters: PromptEngine binds the sim clock; WatchRoom owns
+        // membership; BadgeEngine then listens on top of both.
         getPromptEngine().attach(info);
+        getWatchRoomEngine().attach();
+        getBadgeEngine().attach();
+        // In AWS mode, also wire up AppSync subscriptions so server-side
+        // match-events flow into the local MatchSim. The local tick loop
+        // stays dormant — see SimControls for the AWS-vs-local kickoff fork.
+        if (isAwsMode) attachAwsBridge();
         setState({ info, ready: true, error: null });
       } catch (err) {
         if (cancelled) return;

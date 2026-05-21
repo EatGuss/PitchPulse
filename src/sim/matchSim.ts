@@ -27,8 +27,12 @@ export interface SimEventMap extends Record<string, unknown> {
 }
 
 const TICK_INTERVAL_MS = 100;
+// Cast via an opt-typed view so headless verify scripts can import this
+// module under Node where `import.meta.env` is undefined. Vite still injects
+// the env object at build time; Node sees `undefined` and we fall back.
+const _viteEnv = (import.meta as { env?: Partial<ImportMetaEnv> }).env;
 const SECONDS_PER_MATCH_MINUTE = Number(
-  import.meta.env.VITE_SIM_SECONDS_PER_MATCH_MINUTE ?? 2,
+  _viteEnv?.VITE_SIM_SECONDS_PER_MATCH_MINUTE ?? 2,
 );
 
 export class MatchSim {
@@ -46,6 +50,25 @@ export class MatchSim {
     isRunning: false,
   };
   private loaded = false;
+  /**
+   * AWS-mode only: tracks whether we've taken the server's clock score yet.
+   * The first matchClock subscription frame bootstraps the local score so a
+   * mid-match tab refresh sees the correct current score; every subsequent
+   * clock arrival preserves the local score (which goal events drive). This
+   * keeps the score-in-header in lockstep with the goal card landing in the
+   * feed instead of jumping ahead by the AppSync subscription delivery race.
+   */
+  private hasBootstrappedScore = false;
+  /**
+   * Idempotency set for injected events. The AWS sim-emitter Lambda can be
+   * invoked concurrently (manual invoke from start-match + EventBridge cron
+   * safety-net), and each invocation rewrites the same seq#s with new
+   * emittedAt timestamps. DDB Streams fans both writes through the
+   * stream-handler → AppSync pipeline, so subscribers can see the same event
+   * id more than once. Deduping here means we don't have to harden every
+   * downstream consumer (feed, prompts, badges, reactions) individually.
+   */
+  private seenEventIds = new Set<string>();
 
   /** Fetches the prebuilt events.json. Idempotent. */
   async load(): Promise<void> {
@@ -88,6 +111,8 @@ export class MatchSim {
     this.pause();
     this.cursor = 0;
     this.startedAt = null;
+    this.hasBootstrappedScore = false;
+    this.seenEventIds.clear();
     this.state = {
       matchMinute: 0,
       displayClock: "0'",
@@ -104,6 +129,63 @@ export class MatchSim {
 
   isLoaded(): boolean {
     return this.loaded;
+  }
+
+  // ── AWS bridge injection points (Gate 4) ───────────────────────────────────
+  // In AWS mode the local tick loop never starts; instead the AppSync bridge
+  // calls injectClock() / injectEvent() with payloads received over the
+  // matchClock + matchEvent subscriptions. The UI consumes the same `clock`
+  // and `event` bus topics as before — nothing downstream needs to change.
+
+  /**
+   * Replace clock state from an external source (AppSync subscription).
+   *
+   * Score handling is subtle: the matchClock payload always carries the
+   * server's current score, but applying it directly causes the score in
+   * <MatchHeader> to update milliseconds BEFORE the corresponding goal card
+   * lands in <EventFeed>, because the matchClock and matchEvent subscriptions
+   * arrive on independent WebSocket frames. To keep them visually in sync we
+   * accept the clock's score only on the FIRST arrival (bootstrapping a
+   * mid-match tab refresh) and preserve the local score on every clock after
+   * that. The score then moves only when injectEvent() processes a goal.
+   */
+  injectClock(state: MatchClockState): void {
+    const score = this.hasBootstrappedScore ? this.state.score : state.score;
+    this.hasBootstrappedScore = true;
+    this.state = { ...state, score };
+    this.bus.emit('clock', this.state);
+  }
+
+  /**
+   * Inject a single normalized event from an external source.
+   *
+   * Drops the event if its id has already been delivered (see seenEventIds
+   * above for the race that makes this necessary).
+   *
+   * For goal events we emit BOTH 'event' (feed card) and 'clock' (score
+   * update) inside the same synchronous call so React batches them into a
+   * single render — the score change and the goal card appear together.
+   */
+  injectEvent(event: NormalizedEvent): void {
+    if (this.seenEventIds.has(event.id)) return;
+    this.seenEventIds.add(event.id);
+
+    const scoreChanged =
+      event.scoreAfter !== undefined &&
+      (event.scoreAfter.home !== this.state.score.home ||
+        event.scoreAfter.guest !== this.state.score.guest);
+    if (scoreChanged && event.scoreAfter) {
+      this.state = { ...this.state, score: event.scoreAfter };
+    }
+    this.bus.emit('event', event);
+    // Emit the clock update AFTER the event so React's batched render shows
+    // the goal card and updated score in the same frame.
+    if (scoreChanged) {
+      this.bus.emit('clock', this.state);
+    }
+    if (event.type === 'fullTime') {
+      this.bus.emit('end', { finalScore: event.scoreAfter ?? this.state.score });
+    }
   }
 
   // ── private ─────────────────────────────────────────────────────────────────
