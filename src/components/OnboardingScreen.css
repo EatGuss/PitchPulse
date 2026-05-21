@@ -1,0 +1,199 @@
+/* OnboardingScreen — full-screen mobile splash.
+   Fits inside the 390×844 phone frame (or fills the viewport in ?frame=off).
+   Scrollable if content exceeds the viewport on shorter mobile devices. */
+
+.onb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  padding: 22px 20px calc(var(--pp-phone-safebottom) + 18px);
+  background:
+    radial-gradient(120% 60% at 50% -8%, rgba(225, 14, 31, 0.22), transparent 65%),
+    radial-gradient(80% 50% at 20% 110%, rgba(46, 204, 113, 0.10), transparent 60%),
+    var(--pp-bg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Hero ──────────────────────────────────────────────────────────────── */
+.onb__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.onb__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--pp-text);
+}
+.onb__brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  box-shadow: 0 0 12px var(--pp-accent);
+}
+.onb__brand-name { line-height: 1; }
+
+.onb__title {
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pp-text);
+  margin: 6px 0 4px;
+}
+.onb__sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--pp-text-muted);
+  margin: 0;
+  max-width: 340px;
+}
+
+/* ─── Three pillars chip row ───────────────────────────────────────────── */
+.onb__pillars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 22px;
+}
+.onb__pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--pp-text);
+  font-weight: 600;
+}
+.onb__pill-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--pp-surface-2);
+  font-size: 13px;
+}
+
+/* ─── Profile chooser ───────────────────────────────────────────────────── */
+.onb__choose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+}
+.onb__choose-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--pp-text-muted);
+  text-align: center;
+  margin: 0 0 2px;
+}
+.onb__choose-foot {
+  font-size: 11px;
+  color: var(--pp-text-faint);
+  text-align: center;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.onb__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--pp-surface-2) 0%, var(--pp-surface) 100%);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-r-lg);
+  color: var(--pp-text);
+  text-align: left;
+  transition: border-color var(--pp-d-fast) var(--pp-ease),
+              background var(--pp-d-fast) var(--pp-ease);
+  cursor: pointer;
+}
+.onb__user:hover {
+  border-color: var(--pp-accent);
+  background: linear-gradient(180deg, var(--pp-surface-3) 0%, var(--pp-surface-2) 100%);
+}
+.onb__user:focus-visible {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 3px;
+}
+
+.onb__user-avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--pp-surface-3);
+  font-size: 22px;
+  border: 1px solid var(--pp-border-strong);
+}
+
+.onb__user-txt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.onb__user-name {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.onb__user-meta {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--pp-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.3;
+}
+.onb__user-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+.onb__user-cta {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px -4px rgba(225, 14, 31, 0.6);
+}
+
+/* ─── Disclosure (last thing read) ─────────────────────────────────────── */
+.onb__disc {
+  margin-top: 14px;
+}

@@ -1,0 +1,4 @@
+https://github.com/<your-github-handle>/PitchPulse
+
+# Replace with the public (or MoellerO-invited private) GitHub URL of this repo
+# before zipping. The brief's submission package expects this one-line file.

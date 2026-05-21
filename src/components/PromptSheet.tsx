@@ -8,8 +8,11 @@
  *   - 'locked'   : window closed, "Waiting for resolution…", picks frozen
  *   - 'resolved' : winner badge, +N coin animation OR "No coins this round"
  *
- * Note: no drag-to-dismiss. The voter cannot escape an active prompt — that's
- * how the multiplayer + gamification pillar stays honest.
+ * Collapse-after-vote: once a viewer has locked in a pick (myPickedOptionId
+ * is set), they can collapse the sheet to a thin pill at the bottom of the
+ * phone — gives them back the event feed while the window runs out. The
+ * vote is irrevocable, so collapsing isn't an escape hatch. We always auto-
+ * expand on 'resolved' so the outcome can't be missed.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -107,6 +110,9 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
   // Auto-dismiss the resolved overlay shortly after resolution.
   // (The engine clears `active` after 3.2s; we fade out a touch earlier.)
   const [dismissed, setDismissed] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  // Tap-to-show rules popover (mobile-first: no hover-only tooltips per spec).
+  const [helpOpen, setHelpOpen] = useState(false);
   // Wall-clock tick so the countdown ring updates smoothly even when no
   // engine event fires (the engine ticks at sim cadence; this drives UI).
   const [, setNowMs] = useState(Date.now());
@@ -119,13 +125,26 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
   useEffect(() => {
     if (!prompt) {
       setDismissed(false);
+      setCollapsed(false);
+      setHelpOpen(false);
       return;
     }
     if (prompt.state === 'resolved') {
+      // Force-expand so the viewer sees the outcome no matter how they left it.
+      setCollapsed(false);
+      setHelpOpen(false);
       const t = setTimeout(() => setDismissed(true), 2900);
       return () => clearTimeout(t);
     }
   }, [prompt?.state, prompt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fresh prompt → fresh expanded view. (Same component instance re-renders
+  // for back-to-back prompts; without this the "collapsed" / "helpOpen"
+  // carries over.)
+  useEffect(() => {
+    setCollapsed(false);
+    setHelpOpen(false);
+  }, [prompt?.id]);
 
   const visible = !!prompt && !dismissed;
   const secondsLeft = useMemo(() => {
@@ -143,6 +162,39 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
   // (The actual coin balance animation lives in CoinBalance — driven by useUserBalance.
   // This sheet only narrates the result.)
 
+  const pickedOption = prompt.options.find((o) => o.id === myPickedOptionId) ?? null;
+  // Collapse is available only AFTER you've voted, and only while the prompt
+  // is still in flight (open or locked). Resolved view is always full-panel.
+  const canCollapse = !!pickedOption && (prompt.state === 'open' || prompt.state === 'locked');
+
+  // ── Collapsed view: thin pill at the bottom, lets the event feed breathe.
+  if (visible && collapsed && canCollapse && pickedOption) {
+    return (
+      <div className="ps ps--collapsed is-visible" role="region" aria-label="Active prediction (collapsed)">
+        <button
+          type="button"
+          className="ps-mini"
+          onClick={() => setCollapsed(false)}
+          aria-label="Expand prediction"
+        >
+          <span className="ps-mini__state" data-state={prompt.state} aria-hidden="true" />
+          <span className="ps-mini__txt">
+            <span className="ps-mini__label">{prompt.state === 'open' ? 'YOUR PICK · LIVE' : 'YOUR PICK · LOCKED'}</span>
+            <span className="ps-mini__option">{pickedOption.label}</span>
+          </span>
+          {prompt.state === 'open' ? (
+            <span className="ps-mini__timer tabular" aria-label={`${Math.ceil(secondsLeft)} seconds left`}>
+              {Math.max(0, Math.ceil(secondsLeft))}s
+            </span>
+          ) : (
+            <span className="ps-mini__timer" aria-hidden="true">🔒</span>
+          )}
+          <span className="ps-mini__chev" aria-hidden="true">↑</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={`ps ${visible ? 'is-visible' : 'is-leaving'}`} role="dialog" aria-modal="true" aria-label="Live prediction">
       <div className="ps__backdrop" aria-hidden="true" />
@@ -157,14 +209,57 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
               {prompt.state === 'open' ? 'LIVE' : prompt.state === 'locked' ? 'LOCKED' : 'RESULT'}
             </span>
           </div>
-          {prompt.state === 'open' ? (
-            <CountdownRing secondsLeft={secondsLeft} totalSeconds={WINDOW_REAL_SEC} />
-          ) : (
-            <span className="ps__votes tabular">{totalVotes} votes</span>
-          )}
+          <div className="ps__top-right">
+            {prompt.state === 'open' ? (
+              <CountdownRing secondsLeft={secondsLeft} totalSeconds={WINDOW_REAL_SEC} />
+            ) : (
+              <span className="ps__votes tabular">{totalVotes} votes</span>
+            )}
+            {canCollapse && (
+              <button
+                type="button"
+                className="ps__collapse"
+                onClick={() => setCollapsed(true)}
+                aria-label="Collapse prediction"
+                title="Collapse"
+              >
+                ↓
+              </button>
+            )}
+          </div>
         </div>
 
-        <h2 className="ps__q">{prompt.copy}</h2>
+        <div className="ps__qrow">
+          <h2 className="ps__q">{prompt.copy}</h2>
+          <button
+            type="button"
+            className="ps__help"
+            aria-label="How rewards work"
+            aria-expanded={helpOpen}
+            onClick={() => setHelpOpen((v) => !v)}
+          >
+            ⓘ
+          </button>
+        </div>
+
+        {helpOpen && (
+          <div className="ps__tooltip" role="tooltip" aria-live="polite">
+            <div className="ps__tooltip-title">How rewards work</div>
+            <ul className="ps__tooltip-list">
+              <li>
+                <strong>Vote within {WINDOW_REAL_SEC}s.</strong> Window enforced
+                server-side — late votes don&apos;t count.
+              </li>
+              <li>
+                <strong>Odds reward minority correct picks.</strong> Payout = base ×
+                <span className="tabular"> min(1 / your_vote_share, 5.0)</span>.
+              </li>
+              <li>
+                <strong>Wrong = 0 coins.</strong> Never negative. Never real money.
+              </li>
+            </ul>
+          </div>
+        )}
 
         <div className="ps__opts">
           {prompt.options.map((opt) => {
@@ -192,7 +287,7 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
 
         {prompt.state === 'open' && (
           <p className="ps__hint">
-            <span className="ps__hint-i">ⓘ</span> Vote within 30s. Odds reward minority correct picks.
+            <span className="ps__hint-i">ⓘ</span> Vote within {WINDOW_REAL_SEC}s. Odds reward minority correct picks.
           </p>
         )}
         {prompt.state === 'locked' && (

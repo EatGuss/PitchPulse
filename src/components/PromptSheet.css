@@ -61,6 +61,30 @@
   color: var(--pp-text-muted);
 }
 .ps__cat { color: var(--pp-text); }
+.ps__top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ps__collapse {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--pp-surface-3);
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--pp-d-fast) var(--pp-ease),
+              color var(--pp-d-fast) var(--pp-ease);
+}
+.ps__collapse:hover {
+  background: var(--pp-border);
+  color: var(--pp-text);
+}
 .ps__state-dot {
   width: 6px;
   height: 6px;
@@ -87,13 +111,81 @@
 }
 
 /* Question */
+.ps__qrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
 .ps__q {
+  flex: 1;
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.25;
   color: var(--pp-text);
   margin: 0;
+}
+.ps__help {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--pp-surface-3);
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text-muted);
+  font-size: 13px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--pp-d-fast) var(--pp-ease),
+              background var(--pp-d-fast) var(--pp-ease),
+              border-color var(--pp-d-fast) var(--pp-ease);
+}
+.ps__help:hover,
+.ps__help[aria-expanded='true'] {
+  color: var(--pp-text);
+  background: var(--pp-border);
+  border-color: var(--pp-border-strong);
+}
+
+/* Tap-tooltip (mobile-first; never relies on hover) */
+.ps__tooltip {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-r-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: var(--pp-text-muted);
+  line-height: 1.5;
+  animation: ps-tip-in 220ms var(--pp-ease);
+}
+.ps__tooltip-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--pp-text);
+  margin-bottom: 4px;
+}
+.ps__tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps__tooltip-list strong {
+  color: var(--pp-text);
+  font-weight: 700;
+}
+
+@keyframes ps-tip-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Option buttons */
@@ -206,4 +298,104 @@
   font-family: Georgia, serif;
   border-radius: 50%;
   background: var(--pp-surface-2);
+}
+
+/* ─── Collapsed mini-pill ────────────────────────────────────────────────── */
+/* Used when the viewer has voted and chosen to collapse the sheet so the */
+/* event feed underneath is visible. pointer-events is none on the wrapper */
+/* so taps fall through to the feed; only the pill itself is interactive.  */
+
+.ps.ps--collapsed {
+  pointer-events: none;
+  /* No backdrop — the rest of the phone UI shows through. */
+}
+
+.ps-mini {
+  pointer-events: auto;
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(var(--pp-phone-safebottom) + 10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--pp-surface-2) 0%, var(--pp-surface) 100%);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+  color: var(--pp-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--pp-d-fast) var(--pp-ease),
+              border-color var(--pp-d-fast) var(--pp-ease);
+  animation: ps-mini-in 220ms var(--pp-ease);
+}
+.ps-mini:hover {
+  background: linear-gradient(180deg, var(--pp-surface-3) 0%, var(--pp-surface-2) 100%);
+  border-color: var(--pp-text-muted);
+}
+.ps-mini:focus-visible {
+  outline: 2px solid var(--pp-accent);
+  outline-offset: 2px;
+}
+
+.ps-mini__state {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-text-faint);
+  flex-shrink: 0;
+}
+.ps-mini__state[data-state='open'] {
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px var(--pp-accent);
+  animation: pulse 1.4s infinite;
+}
+.ps-mini__state[data-state='locked'] {
+  background: var(--pp-warning);
+}
+
+.ps-mini__txt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ps-mini__label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--pp-text-muted);
+  line-height: 1.2;
+}
+.ps-mini__option {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text);
+  line-height: 1.25;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-mini__timer {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+  min-width: 26px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.ps-mini__chev {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+@keyframes ps-mini-in {
+  from { transform: translateY(110%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }
