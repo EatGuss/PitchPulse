@@ -36,6 +36,12 @@ function writeUserParam(userId: DemoUserId) {
   window.history.replaceState({}, '', url.toString());
 }
 
+function clearUserParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('as');
+  window.history.replaceState({}, '', url.toString());
+}
+
 export function SinglePhonePage() {
   const [userId, setUserId] = useState<DemoUserId | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -51,6 +57,11 @@ export function SinglePhonePage() {
   const handleContinue = (chosen: DemoUserId) => {
     writeUserParam(chosen);
     setUserId(chosen);
+  };
+
+  const handleSwitchUser = () => {
+    clearUserParam();
+    setUserId(null);
   };
 
   const showOnboarding = userId === null;
@@ -75,7 +86,7 @@ export function SinglePhonePage() {
         {showOnboarding ? (
           <OnboardingScreen onContinue={handleContinue} />
         ) : (
-          <MatchPage userId={userId!} />
+          <MatchPage userId={userId!} onSwitchUser={handleSwitchUser} />
         )}
       </PhoneFrame>
       <div style={{ width: '100%', maxWidth: 540 }}>

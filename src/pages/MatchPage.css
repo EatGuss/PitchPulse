@@ -13,8 +13,58 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px 12px;
-  gap: 10px;
+  padding: 8px 12px 12px;
+  gap: 8px;
+}
+
+.mpage__topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mpage__switch-user {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--pp-border);
+  border-radius: 999px;
+  background: var(--pp-surface);
+  color: var(--pp-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.mpage__switch-user:hover {
+  background: var(--pp-surface-2);
+  color: var(--pp-text);
+  border-color: var(--pp-border-strong);
+}
+
+.mpage__switch-user-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mpage__switch-user-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .mpage__switch-user-label {
+    display: none;
+  }
+  .mpage__switch-user {
+    padding: 0 12px;
+  }
 }
 
 .mpage--loading,

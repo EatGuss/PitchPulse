@@ -31,9 +31,11 @@ export interface MatchPageProps {
   userId: DemoUserId;
   /** Hide the dev sim controls (useful on /demo where the controls live between phones). */
   hideSimControls?: boolean;
+  /** Return to the Alice/Bob picker (single-phone `/` route only). */
+  onSwitchUser?: () => void;
 }
 
-export function MatchPage({ userId, hideSimControls = false }: MatchPageProps) {
+export function MatchPage({ userId, hideSimControls = false, onSwitchUser }: MatchPageProps) {
   const { info, ready, error } = useMatchData();
   const { clock, events } = useMatchSimState();
   const { prompt, vote, myPickedOptionId } = useActivePrompt(userId);
@@ -69,7 +71,20 @@ export function MatchPage({ userId, hideSimControls = false }: MatchPageProps) {
   return (
     <div className="mpage">
       <div className="mpage__topbar">
-        <ProfilePill userId={userId} />
+        <div className="mpage__topbar-start">
+          {onSwitchUser && (
+            <button
+              type="button"
+              className="mpage__switch-user"
+              onClick={onSwitchUser}
+              aria-label="Switch demo fan — choose Alice or Bob"
+            >
+              <span className="mpage__switch-user-icon" aria-hidden="true">←</span>
+              <span className="mpage__switch-user-label">Switch fan</span>
+            </button>
+          )}
+          <ProfilePill userId={userId} />
+        </div>
         <CoinBalance value={balance} />
       </div>
       <MatchHeader info={info} clock={clock} />
