@@ -41,6 +41,7 @@ export class WatchRoomEngine {
   /** Most-recent-first ring buffer. Bounded so memory doesn't grow with a long match. */
   private reactions: ReactionEvent[] = [];
   private nextSeq = 1;
+  private seenReactionKeys = new Set<string>();
   private unsubReady?: () => void;
 
   /** Bind to MatchSim so a sim `reset()` clears reaction history. Idempotent. */
@@ -52,6 +53,7 @@ export class WatchRoomEngine {
 
   resetState(): void {
     this.reactions = [];
+    this.seenReactionKeys.clear();
     // Membership is preserved across resets — alice/bob stay in the room.
     this.bus.emit('reset', undefined);
   }
@@ -77,13 +79,50 @@ export class WatchRoomEngine {
 
   fireReaction(userId: string, emoji: ReactionEmoji): ReactionEvent | null {
     if (!this.members.has(userId)) return null;
+    return this.emitReaction(userId, emoji);
+  }
+
+  /** Inject a reaction from AppSync (or another phone) without re-broadcasting. */
+  injectReaction(
+    userId: string,
+    emoji: string,
+    ts = Date.now(),
+    reactionId?: string,
+  ): ReactionEvent | null {
+    if (!REACTION_EMOJIS.includes(emoji as ReactionEmoji)) return null;
+    const dedupeKey = reactionId ?? `${userId}:${emoji}:${ts}`;
+    if (this.seenReactionKeys.has(dedupeKey)) return null;
+    this.seenReactionKeys.add(dedupeKey);
+    return this.emitReaction(userId, emoji as ReactionEmoji, ts, reactionId);
+  }
+
+  /** Replace membership — used when entering a private Watch Room match. */
+  setMembers(userIds: string[]): void {
+    this.members = new Set(userIds);
+  }
+
+  setRoomId(roomId: string | null): void {
+    this.roomId = roomId;
+  }
+
+  getRoomId(): string | null {
+    return this.roomId;
+  }
+
+  private roomId: string | null = null;
+
+  private emitReaction(
+    userId: string,
+    emoji: ReactionEmoji,
+    ts = Date.now(),
+    reactionId?: string,
+  ): ReactionEvent {
     const ev: ReactionEvent = {
-      id: `r-${this.nextSeq++}-${userId}-${Date.now()}`,
+      id: reactionId ?? `r-${this.nextSeq++}-${userId}-${ts}`,
       userId,
       emoji,
-      ts: Date.now(),
+      ts,
     };
-    // Newest at index 0; trim from the tail.
     this.reactions.unshift(ev);
     if (this.reactions.length > MAX_RING_BUFFER) {
       this.reactions.length = MAX_RING_BUFFER;

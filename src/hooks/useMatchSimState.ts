@@ -14,6 +14,7 @@ import type { MatchClockState, NormalizedEvent } from '../domain/types';
 export interface MatchSimState {
   clock: MatchClockState;
   events: NormalizedEvent[];
+  paused: boolean;
 }
 
 const EMPTY_CLOCK: MatchClockState = {
@@ -28,24 +29,35 @@ export function useMatchSimState(): MatchSimState {
   const sim = getMatchSim();
   const [clock, setClock] = useState<MatchClockState>(() => sim.getState() ?? EMPTY_CLOCK);
   const [events, setEvents] = useState<NormalizedEvent[]>([]);
+  const [paused, setPaused] = useState(() => sim.isPaused());
 
   useEffect(() => {
-    const offClock = sim.bus.on('clock', (c) => setClock(c));
+    const offClock = sim.bus.on('clock', (c) => {
+      setClock(c);
+      setPaused(sim.isPaused());
+    });
     const offEvent = sim.bus.on('event', (e) => {
       setEvents((prev) => {
-        // Guard against duplicates if reset() is followed by a replay.
-        if (prev.length && prev[prev.length - 1].id === e.id) return prev;
+        if (prev.some((existing) => existing.id === e.id)) return prev;
         return [...prev, e];
       });
     });
-    // Also reset our local list when the sim is reset.
-    const offReady = sim.bus.on('ready', () => setEvents([]));
+    const clearEvents = () => setEvents([]);
+    const offReady = sim.bus.on('ready', () => {
+      clearEvents();
+      setPaused(sim.isPaused());
+    });
+    const offReset = sim.bus.on('reset', () => {
+      clearEvents();
+      setPaused(sim.isPaused());
+    });
     return () => {
       offClock();
       offEvent();
       offReady();
+      offReset();
     };
   }, [sim]);
 
-  return { clock, events };
+  return { clock, events, paused };
 }

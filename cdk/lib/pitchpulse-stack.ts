@@ -5,7 +5,7 @@
  *     pp-users    — coin balances, streaks, badge unlocks (no Streams)
  *     pp-matches  — CLOCK + EVENT items; Streams → stream-handler Lambda
  *     pp-prompts  — prompt META + VOTE items, TTL on expiresAt
- *     pp-rooms    — room reactions (TTL on expiresAt), members
+ *     pp-rooms    — Watch Room META/MEMBER/COMMENT/REACTION items + InviteCode GSI
  *
  *   Lambda
  *     sim-emitter    — reads XML from S3, advances match-time, writes EVENTs
@@ -103,6 +103,12 @@ export class PitchPulseStack extends Stack {
       tableName: 'pp-rooms',
       timeToLiveAttribute: 'expiresAt',
     });
+    // Sparse GSI — only META rows carry inviteCode for joinRoom lookup.
+    roomsTable.addGlobalSecondaryIndex({
+      indexName: 'InviteCodeIndex',
+      partitionKey: { name: 'inviteCode', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
 
     // ─── Lambda functions ──────────────────────────────────────────────
 
@@ -194,6 +200,19 @@ export class PitchPulseStack extends Stack {
       }),
     );
 
+    const roomHandlerFn = new lambdaNodejs.NodejsFunction(this, 'RoomHandlerFn', {
+      ...fnDefaults,
+      functionName: 'pp-room-handler',
+      entry: path.join(CDK_ROOT, 'lambda', 'room-handler', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(15),
+      memorySize: 256,
+      environment: {
+        ROOMS_TABLE: roomsTable.tableName,
+      },
+    });
+    roomsTable.grantReadWriteData(roomHandlerFn);
+
     // ─── AppSync GraphQL API ───────────────────────────────────────────
 
     const api = new appsync.GraphqlApi(this, 'Api', {
@@ -239,6 +258,7 @@ export class PitchPulseStack extends Stack {
     const roomsDS = api.addDynamoDbDataSource('RoomsDS', roomsTable);
     const promptsDS = api.addDynamoDbDataSource('PromptsDS', promptsTable);
     const startMatchDS = api.addLambdaDataSource('StartMatchDS', startMatchFn);
+    const roomHandlerDS = api.addLambdaDataSource('RoomHandlerDS', roomHandlerFn);
 
     // ─── AppSync resolvers ─────────────────────────────────────────────
 
@@ -278,6 +298,30 @@ export class PitchPulseStack extends Stack {
     startMatchDS.createResolver('StartMatchResolver', {
       typeName: 'Mutation',
       fieldName: 'startMatch',
+    });
+
+    roomHandlerDS.createResolver('CreateRoomResolver', {
+      typeName: 'Mutation',
+      fieldName: 'createRoom',
+    });
+    roomHandlerDS.createResolver('JoinRoomResolver', {
+      typeName: 'Mutation',
+      fieldName: 'joinRoom',
+    });
+    roomHandlerDS.createResolver('PostCommentResolver', {
+      typeName: 'Mutation',
+      fieldName: 'postComment',
+    });
+    roomHandlerDS.createResolver('LeaveRoomResolver', {
+      typeName: 'Mutation',
+      fieldName: 'leaveRoom',
+    });
+
+    noneDS.createResolver('PublishRoomLeaderboardResolver', {
+      typeName: 'Mutation',
+      fieldName: 'publishRoomLeaderboard',
+      runtime: jsRuntime,
+      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishRoomLeaderboard.js')),
     });
 
     // ─── EventBridge cron (safety-net for sim-emitter loop) ────────────
@@ -323,11 +367,18 @@ export class PitchPulseStack extends Stack {
           `${api.arn}/types/Mutation/fields/startMatch`,
           `${api.arn}/types/Mutation/fields/fireReaction`,
           `${api.arn}/types/Mutation/fields/submitVote`,
+          `${api.arn}/types/Mutation/fields/createRoom`,
+          `${api.arn}/types/Mutation/fields/joinRoom`,
+          `${api.arn}/types/Mutation/fields/postComment`,
+          `${api.arn}/types/Mutation/fields/leaveRoom`,
           // Client-receivable subscriptions
           `${api.arn}/types/Subscription/fields/matchClock`,
           `${api.arn}/types/Subscription/fields/matchEvent`,
           `${api.arn}/types/Subscription/fields/roomReaction`,
           `${api.arn}/types/Subscription/fields/voteSubmitted`,
+          `${api.arn}/types/Subscription/fields/roomMemberJoined`,
+          `${api.arn}/types/Subscription/fields/roomComment`,
+          `${api.arn}/types/Subscription/fields/roomLeaderboardUpdate`,
           // Schema sanity check
           `${api.arn}/types/Query/fields/ping`,
         ],
@@ -358,7 +409,6 @@ export class PitchPulseStack extends Stack {
     new CfnOutput(this, 'Region', { value: this.region });
     new CfnOutput(this, 'MatchId', { value: MATCH_ID });
 
-    // Silence unused-table warnings — exposed for future Gate 5 wiring.
     void usersTable;
     void promptsTable;
   }

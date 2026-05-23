@@ -21,8 +21,9 @@
 
 import { generateClient } from 'aws-amplify/api';
 import { MATCH_ID, isAwsMode } from './config';
-import { FIRE_REACTION, START_MATCH, SUB_MATCH_CLOCK, SUB_MATCH_EVENT } from './operations';
+import { FIRE_REACTION, START_MATCH, SUB_MATCH_CLOCK, SUB_MATCH_EVENT, SUB_ROOM_REACTION } from './operations';
 import { getMatchSim } from '../sim/matchSim';
+import { getWatchRoomEngine, REACTION_EMOJIS, type ReactionEmoji } from '../sim/watchRoomEngine';
 import type { MatchClockState, NormalizedEvent, NormalizedEventType, MatchPhase } from '../domain/types';
 
 /**
@@ -69,6 +70,8 @@ interface MatchEventPayload {
 
 let attached = false;
 let unsubscribers: Array<() => void> = [];
+let reactionBridgeRoomId: string | null = null;
+let reactionBridgeUnsub: (() => void) | null = null;
 
 function clockFromPayload(p: MatchClockPayload): MatchClockState {
   return {
@@ -194,11 +197,64 @@ export async function awsStartMatch(): Promise<void> {
   }
 }
 
-/** Broadcast a reaction emoji to all connected viewers. */
-export async function awsFireReaction(userId: string, emoji: string): Promise<void> {
+/** Reset the server-side match timeline (same as kick off — seq restarts at 0). */
+export async function awsResetMatch(): Promise<void> {
+  return awsStartMatch();
+}
+
+/** Broadcast a reaction emoji to all connected viewers in a room. */
+export async function awsFireReaction(
+  roomId: string,
+  userId: string,
+  emoji: string,
+): Promise<void> {
   const client = generateClient();
   await client.graphql({
     query: FIRE_REACTION,
-    variables: { input: { matchId: MATCH_ID, userId, emoji } },
+    variables: { input: { roomId, userId, emoji } },
   });
+}
+
+/** Subscribe once per room to room-scoped reactions and inject into the local engine. */
+export function ensureWatchRoomReactionBridge(roomId: string): void {
+  if (!isAwsMode) return;
+  if (reactionBridgeRoomId === roomId && reactionBridgeUnsub) return;
+
+  reactionBridgeUnsub?.();
+  reactionBridgeRoomId = roomId;
+
+  const client = generateClient();
+  const engine = getWatchRoomEngine();
+  const obs = client.graphql({
+    query: SUB_ROOM_REACTION,
+    variables: { roomId },
+  }) as unknown as SubscriptionLike<{
+    roomReaction: { userId: string; emoji: string; ts: number; reactionId: string };
+  }>;
+
+  const sub = obs.subscribe({
+    next: ({ data }) => {
+      const r = data?.roomReaction;
+      if (!r) return;
+      if (!REACTION_EMOJIS.includes(r.emoji as ReactionEmoji)) return;
+      engine.injectReaction(r.userId, r.emoji, r.ts, r.reactionId);
+    },
+    error: (err) => {
+      console.error('[aws-bridge] roomReaction subscription error', err);
+    },
+  });
+
+  reactionBridgeUnsub = () => {
+    sub.unsubscribe();
+    if (reactionBridgeRoomId === roomId) {
+      reactionBridgeRoomId = null;
+      reactionBridgeUnsub = null;
+    }
+  };
+}
+
+/** @deprecated Prefer ensureWatchRoomReactionBridge — kept for call-site compat. */
+export function attachWatchRoomReactionBridge(roomId: string): () => void {
+  ensureWatchRoomReactionBridge(roomId);
+  return () => {};
 }

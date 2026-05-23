@@ -1,0 +1,231 @@
+.wr-lobby {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  padding: 22px 20px calc(var(--pp-phone-safebottom) + 18px);
+  background:
+    radial-gradient(100% 70% at 80% 0%, rgba(225, 14, 31, 0.14), transparent 55%),
+    var(--pp-bg);
+  overflow-y: auto;
+}
+
+.wr-lobby__toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text);
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  animation: wr-toast-in var(--pp-d-med) var(--pp-ease);
+}
+
+@keyframes wr-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.wr-lobby__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.wr-lobby__back {
+  align-self: flex-start;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.wr-lobby__back:hover {
+  color: var(--pp-text);
+}
+
+.wr-lobby__eyebrow {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pp-text);
+  line-height: 1.1;
+}
+
+.wr-lobby__status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 88px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: linear-gradient(180deg, var(--pp-surface-2) 0%, var(--pp-surface) 100%);
+  border: 1px dashed rgba(225, 14, 31, 0.45);
+  border-radius: var(--pp-r-lg);
+  cursor: pointer;
+  transition: border-color var(--pp-d-fast) var(--pp-ease);
+}
+
+.wr-lobby__code:hover {
+  border-color: var(--pp-accent);
+}
+
+.wr-lobby__code-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__code-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--pp-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-lobby__code-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pp-accent);
+}
+
+.wr-lobby__members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.wr-lobby__members-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wr-lobby__member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-md);
+}
+
+.wr-lobby__avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--pp-surface-3);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.wr-lobby__member-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wr-lobby__member-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pp-text);
+}
+
+.wr-lobby__host-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pp-accent);
+}
+
+.wr-lobby__start {
+  margin-top: 20px;
+  min-height: 52px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+  background: var(--pp-accent);
+  border: none;
+  border-radius: var(--pp-r-lg);
+  cursor: pointer;
+  box-shadow: 0 4px 18px -6px rgba(225, 14, 31, 0.7);
+}
+
+.wr-lobby--starting {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--pp-surface-2);
+  border-top-color: var(--pp-accent);
+  border-radius: 50%;
+  animation: wr-spin 900ms linear infinite;
+}
+
+@keyframes wr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

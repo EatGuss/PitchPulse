@@ -149,6 +149,7 @@ export class PromptEngine {
     if (!a) return false;
     if (a.id !== promptId) return false;
     if (a.state !== 'open') return false;
+    if (getMatchSim().isPaused()) return true;
     if (Date.now() > a.closesAtWallMs) return false;
     if (!a.options.some((o) => o.id === optionId)) return false;
     if (!this.users.has(userId)) return false;
@@ -173,8 +174,12 @@ export class PromptEngine {
     if (this.active) {
       this.active.serverMinute = state.matchMinute;
 
-      // Close the 30-wall-second window once it expires (server-clock authority).
-      if (this.active.state === 'open' && Date.now() >= this.active.closesAtWallMs) {
+      // Close the 30-wall-second window once it expires — only while the match is running.
+      if (
+        this.active.state === 'open' &&
+        state.isRunning &&
+        Date.now() >= this.active.closesAtWallMs
+      ) {
         this.active.state = 'locked';
         this.bus.emit('promptClosed', { prompt: this.snapshot(this.active) });
       }
@@ -184,6 +189,8 @@ export class PromptEngine {
         this.tryResolve();
       }
     }
+
+    if (!state.isRunning) return;
 
     // Minute-triggered prompts.
     for (const tpl of PROMPT_TEMPLATES) {

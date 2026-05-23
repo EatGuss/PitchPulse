@@ -1,4 +1,4 @@
-# PitchPulse — 3-minute demo video script
+# PitchPulse — 3-minute demo video script (Watch Room cut)
 
 Hackathon: DFL × Adidas × Slalom *Fan Squad* — Challenge 3.
 Recording target: **1920×1080, 30 fps, no voice-over, text-overlay narration only.**
@@ -38,101 +38,95 @@ Static title card before the recording cuts to the browser, OR an overlay strip:
 > **PitchPulse — Real-time social Bundesliga matchday companion**
 > DFL Fan Squad · Challenge 3
 
-### 0:03 — Establishing shot (5 sec)
+### 0:03 — Cold open: onboarding + Mode Picker (12 sec)
 
-Full `/demo` screen. Both phones idle on Onboarding-skipped MatchPage at `0'`, score `0–0`, profile pills visible.
+Full `/demo` screen. Complete onboarding on **both** phones (Alice left, Bob right). Both land on the **Mode Picker**.
 
 **Overlay copy:**
-> Two fans · one watch room · zero signup
+> Two fans · zero signup · pick your mode
 
-### 0:08 — Pillar 2 (Real-time data) (25 sec)
+### 0:15 — Bob creates a Watch Room (15 sec)
 
-Mouse-cursor click on **▶ Kick off**. The match clock starts ticking from `0'`. Within 8–10 wall seconds, an event lands on both phones at the **same match minute**.
+On **Bob's phone**: tap **Watch Room** → **Create Room**. Lobby appears with auto-generated room name and invite code (e.g. `PLZ-482`). Tap the code card to show the copy toast.
 
-- Cursor underlines the match clock on Alice's phone briefly (no annotation needed — UI shows it).
-- When a shot/foul/card card lands in the EventFeed, the same card lands in Bob's feed within ~200 ms.
+**Overlay copy:**
+> Private Watch Room · invite code in one tap
 
-**Overlay copy (timed across this section):**
+### 0:30 — Alice joins (15 sec)
+
+On **Alice's phone**: tap **Watch Room** → **Enter Code** → type Bob's code → **Join Room**. Both phones show the same lobby member list. Bob (host) taps **Start Match**.
+
+**Overlay copy:**
+> Friends join by code · host starts the match
+
+### 0:45 — Kick off + real-time sync (20 sec)
+
+Click **▶ Kick off** on the center control bar. Clock ticks on both phones. Within ~10 wall seconds, the same event card lands on both feeds at the same match minute.
+
+**Overlay copy:**
 > 1 match-minute ≈ 2 real seconds
 >
 > XML replay → DynamoDB Streams → AppSync → both phones in <200 ms
 
-### 0:33 — Pillar 1 (Multiplayer) — vote dance (40 sec)
+### 1:05 — Live picks + vote dance (35 sec)
 
-Wait for the first PromptSheet to slide up. Both phones show it simultaneously.
+Wait for the first PromptSheet. Both phones show it simultaneously.
 
-1. On **Alice's phone**, tap the **first option**. Vote-share % updates on **both phones**.
-2. On **Bob's phone**, tap a **different option**. Vote-share % shifts again — viewers can see the bars rebalance on both screens.
-3. Cursor briefly hovers the ⓘ icon to **expose the tooltip** ("How rewards work" expands). Hold 2 sec, dismiss.
-4. The 5-second window expires → **LOCKED** state on both phones.
-5. The trigger fires (next goal / minute X / HT). Resolution → winning option turns green.
-6. The winning voter's coin balance animates a `+N` chip in the top-right corner of their phone.
-
-**Overlay copy (timed):**
-> Both fans see the same prompt
->
-> Live vote-share updates on both phones
->
-> Vote within 5s. Odds reward minority correct picks.
->
-> Wrong = 0 coins. Never negative. Never real money.
-
-### 1:13 — Pillar 3 (Gamification) — leaderboard + badge (25 sec)
-
-After a resolution where one user wins:
-
-1. The **Leaderboard strip** under the score chip **reorders**. Winner pops to position 1. The viewer's own row outlines in red.
-2. A **badge toast** slides in from the top-right of the appropriate phone (e.g. *First Goal Watcher*, *Card Spotter*).
-3. Cursor briefly highlights the **streak chip** (🔥 2) next to the team code if a user has 2+ correct in a row.
+1. **Alice** taps an option → **Bob's phone immediately shows** *"Alice picked …"* (live reveal).
+2. **Bob** taps a **different** option → vote-share % rebalance on both screens.
+3. Cursor hovers the ⓘ icon briefly (2 sec) to expose "How rewards work".
+4. Window expires → **LOCKED** on both phones.
+5. Trigger fires → resolution → winning option green → `+N` coin chip on the winner's balance.
 
 **Overlay copy:**
-> Live leaderboard · reorders within 200 ms of any coin event
+> Live pick reveal — see your friend's choice instantly
 >
-> Badges unlock automatically · First Goal Watcher · Card Spotter · Half-time Hero · Perfect Predictor
+> Vote within 5s · minority correct picks earn more
+>
+> Wrong = 0 coins · never negative · never real money
 
-### 1:38 — Pillar 1 again — reactions (15 sec)
+### 1:40 — Comments + reactions (25 sec)
 
-On **Alice's phone**, rapidly tap 🔥 ⚽ 🎉 in the reaction bar. Each emoji **puffs up on both phones** with Alice's avatar attached.
+1. On **Alice's phone**, expand **Comments** on the next open prompt. Type a short line (≤ 140 chars) → **Send**. Same comment appears on Bob's thread.
+2. On **Alice's phone**, tap 🔥 ⚽ in the reaction bar. Emoji puffs on **both** screens with Alice's avatar.
 
 **Overlay copy:**
-> Reactions broadcast to the whole watch room
+> Prompt comment threads · plain text · room-scoped
 >
-> 🔥 ⚽ 😱 🎉
+> Reactions broadcast to everyone in the room
 
-### 1:53 — Half-time moment (15 sec)
+### 2:05 — Gamification moment (25 sec)
 
-Wait for `45'` whistle (or fast-forward by trimming dead air in the editor — the section needs to be in the cut). The phase chip flips to **Half time**.
+After a resolution:
 
-If a half-time prompt was active when the whistle blew, the *Half-time Hero* badge toast lands.
+1. **Room sidebar** (right edge) reorders by PitchCoin balance — winner moves up.
+2. **Badge toast** slides in (e.g. *First Goal Watcher*).
+3. Cursor briefly highlights the **streak chip** (🔥 2) if visible.
 
 **Overlay copy:**
-> Half-time. Score, phase, and badges update across both phones simultaneously.
+> Live room leaderboard · badges unlock automatically
 
-### 2:08 — Architecture flash (15 sec)
+### 2:30 — Full-time + winner (20 sec)
 
-Cut to a static slide / overlay of the architecture diagram from `executive_summary.pdf` slide 3. Hold 12 sec. Two on-screen callouts:
-
-**Overlay copy (one slide, two callouts):**
-> EventBridge → Lambda sim-emitter → DynamoDB Streams → stream-handler Lambda → AppSync → both browsers
->
-> Cognito Identity Pool (anonymous) · IAM-auth GraphQL · eu-central-1
-
-### 2:23 — What's next (15 sec)
-
-Hold a slide / overlay listing the deferred features:
+Wait for `90'` / full-time whistle (trim dead air in the editor if needed). Phase chip shows **Full time**. Room sidebar shows final standings.
 
 **Overlay copy:**
-> Next: private rooms · React Native lift-and-shift · Spielmacher squad loop · stadium jumbotron mode
+> Full-time · final room standings · one shared matchday
 
-### 2:38 — Close card (10 sec)
+### 2:50 — Architecture flash (optional trim-in) (8 sec)
 
-End card. Show:
+Quick cut to architecture slide from `executive_summary.pdf` slide 3, OR skip if over time.
+
+**Overlay copy:**
+> AppSync · Lambda · DynamoDB Streams · Cognito · eu-central-1
+
+### 2:58 — Close card (2 sec)
 
 > **PitchPulse**
 > Built for the DFL Fan Squad hackathon · 2026
 > github.com/[your-handle]/PitchPulse
 
-End at 2:48–3:00.
+End at ≤ 3:00.
 
 ---
 
@@ -157,3 +151,7 @@ End at 2:48–3:00.
 - ❌ No keyboard shortcuts visible in frame.
 - ❌ Don't show DevTools, terminal, or `.env.local` in the recording.
 - ❌ Don't go past 3:00. Recut if needed.
+
+## Narrative cheat (editor note)
+
+The original Gate G brief showed Alice briefly in Public Match before joining Bob's room. The script above goes straight to both in a Watch Room — cleaner for a 3-minute cap. If you want the two-mode contrast, insert a 10-second Public Match clip between 0:15 and 0:30 and trim the gamification section accordingly.

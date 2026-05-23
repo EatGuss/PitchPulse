@@ -20,7 +20,7 @@ export interface DataDisclosureProps {
 const HEADLINE = 'Anonymized hackathon match data';
 const BODY =
   'Replayed from the DFL-supplied anonymized XML (match ID DFL-MAT-000001, final 5:0). ' +
-  'Team labels (FC Bayern, Borussia Dortmund) and player numbers are illustrative — ' +
+  'Team labels (FC Team, Club) come from MatchInformations_Anonym.xml in the S3 Match-Events folder — ' +
   'no real-world crests, kits, logos, or player photos are used anywhere in this app.';
 
 export function DataDisclosure({ variant = 'footer' }: DataDisclosureProps) {

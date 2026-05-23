@@ -1,42 +1,80 @@
 /**
- * Display aliases for the anonymized XML team IDs.
+ * Display aliases for anonymized XML team IDs.
  *
- * Per project decision (Gate 0 review): we override the anonymized "FC Team" / "Club"
- * with FC Bayern (FCB) / Borussia Dortmund (BVB) for demo narrative.
- *
- * Hard rules (Challenge brief — no licensed marks):
- *   - Text only. NEVER load club logos, crests, kit images, or player photos.
- *   - `accent` is used as a subtle accent dot on user-team chips ONLY.
- *     Primary UI accent stays Bundesliga red (#E10E1F, var(--pp-accent)).
- *
- * Single source of truth — flipping or anonymizing later is one edit here.
+ * Names are sourced from MatchInformations_Anonym.xml in the S3 Match-Events
+ * folder (parsed to public/match-info.json via npm run parse). useMatchData()
+ * refreshes the snapshot once match-info loads.
  */
 
+import type { MatchInfo, TeamLite } from '../domain/types';
+
 export interface TeamAlias {
-  code: string;       // 3-letter code shown in score chips / leaderboards
-  short: string;      // 1-word short name shown in compact contexts
-  full: string;       // Full display name shown in headers / onboarding
-  accent: string;     // Hex accent used ONLY as user-team dot, never for affordances
+  code: string;
+  short: string;
+  full: string;
+  accent: string;
 }
 
-export const TEAM_ALIASES: Record<string, TeamAlias> = {
-  'DFL-CLU-000001': {
-    code: 'FCB',
-    short: 'Bayern',
-    full: 'FC Bayern',
-    accent: '#DC0714',
+/** Fallback until /match-info.json loads — mirrors MatchInformations_Anonym.xml. */
+const FALLBACK_TEAMS: MatchInfo['teams'] = {
+  home: {
+    id: 'DFL-CLU-000001',
+    role: 'home',
+    xmlName: 'FC Team',
+    xmlShortName: 'Team',
+    xmlThreeLetterCode: 'FCT',
+    players: [],
   },
-  'DFL-CLU-000002': {
-    code: 'BVB',
-    short: 'Dortmund',
-    full: 'Borussia Dortmund',
-    accent: '#FDE100',
+  guest: {
+    id: 'DFL-CLU-000002',
+    role: 'guest',
+    xmlName: 'Club',
+    xmlShortName: 'Club',
+    xmlThreeLetterCode: 'CLU',
+    players: [],
   },
 };
 
+let matchTeams: MatchInfo['teams'] = FALLBACK_TEAMS;
+
+export function setMatchTeamNames(teams: MatchInfo['teams']): void {
+  matchTeams = teams;
+}
+
+export function getMatchTeamNames(): MatchInfo['teams'] {
+  return matchTeams;
+}
+
+function aliasFromTeam(team: TeamLite): TeamAlias {
+  return {
+    code: team.xmlThreeLetterCode,
+    short: team.xmlShortName,
+    full: team.xmlName,
+    accent: team.role === 'home' ? '#DC0714' : '#FDE100',
+  };
+}
+
+/** @deprecated Use teamAlias(teamId) — kept for promptTemplates import stability. */
+export const TEAM_ALIASES: Record<string, TeamAlias> = new Proxy({} as Record<string, TeamAlias>, {
+  get(_target, prop: string) {
+    const teams = getMatchTeamNames();
+    if (prop === teams.home.id) return aliasFromTeam(teams.home);
+    if (prop === teams.guest.id) return aliasFromTeam(teams.guest);
+    return undefined;
+  },
+});
+
 export function teamAlias(teamId: string | undefined): TeamAlias {
-  if (teamId && TEAM_ALIASES[teamId]) return TEAM_ALIASES[teamId];
-  // Fallback so unknown IDs render as their last segment instead of crashing.
+  const teams = getMatchTeamNames();
+  if (teamId === teams.home.id) return aliasFromTeam(teams.home);
+  if (teamId === teams.guest.id) return aliasFromTeam(teams.guest);
   const code = (teamId ?? 'UNK').split('-').pop()?.slice(-3).toUpperCase() ?? 'UNK';
   return { code, short: code, full: code, accent: '#7A8294' };
+}
+
+export function generateWatchRoomName(): string {
+  const teams = getMatchTeamNames();
+  const choices = [teams.home, teams.guest];
+  const idx = crypto.getRandomValues(new Uint8Array(1))[0]! % choices.length;
+  return `${choices[idx]!.xmlShortName} Watchers`;
 }

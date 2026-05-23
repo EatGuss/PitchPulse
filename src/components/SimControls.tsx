@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { getMatchSim } from '../sim/matchSim';
 import { isAwsMode } from '../aws/config';
-import { awsStartMatch } from '../aws/bridge';
+import { awsResetMatch, awsStartMatch } from '../aws/bridge';
 import type { MatchClockState } from '../domain/types';
 import './SimControls.css';
 
@@ -21,17 +21,24 @@ export interface SimControlsProps {
 export function SimControls({ variant = 'inline' }: SimControlsProps) {
   const sim = getMatchSim();
   const [clock, setClock] = useState<MatchClockState>(sim.getState());
+  const [paused, setPaused] = useState(() => sim.isPaused());
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    return sim.bus.on('clock', setClock);
+    return sim.bus.on('clock', (c) => {
+      setClock(c);
+      setPaused(sim.isPaused());
+    });
   }, [sim]);
 
   const onStart = async () => {
+    if (sim.isPaused()) {
+      sim.resume();
+      return;
+    }
     if (isAwsMode) {
       // AWS mode: the server-side sim-emitter Lambda owns the timeline.
-      // Pause/reset on the client are local conveniences only — the source
-      // of truth lives in DynamoDB CLOCK and is broadcast via AppSync.
+      // Pause freezes the client view; resume unblocks AppSync injects.
       setPending(true);
       try {
         await awsStartMatch();
@@ -46,10 +53,31 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
   };
 
   const onPause = () => sim.pause();
-  const onReset = () => sim.reset();
 
-  const canStart = !pending && !clock.isRunning && clock.phase !== 'fullTime';
-  const canPause = !isAwsMode && clock.isRunning;
+  const onReset = async () => {
+    sim.reset();
+    if (isAwsMode) {
+      // Server-side emitter keeps streaming until the CLOCK row is reset.
+      setPending(true);
+      try {
+        await awsResetMatch();
+      } catch (err) {
+        console.error('[simctl] awsResetMatch failed', err);
+      } finally {
+        setPending(false);
+      }
+    }
+  };
+
+  const canStart =
+    !pending &&
+    (paused || (!clock.isRunning && clock.phase !== 'fullTime'));
+  const canPause =
+    !pending &&
+    clock.isRunning &&
+    !paused &&
+    clock.phase !== 'fullTime' &&
+    clock.phase !== 'preMatch';
 
   return (
     <div className={`simctl simctl--${variant}`} role="toolbar" aria-label="Match sim controls">
@@ -66,7 +94,7 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
           disabled={!canStart}
           onClick={onStart}
         >
-          {clock.phase === 'preMatch' ? '▶ Kick off' : '▶ Resume'}
+          {paused ? '▶ Resume' : clock.phase === 'preMatch' ? '▶ Kick off' : '▶ Resume'}
         </button>
         <button type="button" className="simctl__btn" disabled={!canPause} onClick={onPause}>
           ❚❚ Pause

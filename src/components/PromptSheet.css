@@ -66,7 +66,8 @@
   align-items: center;
   gap: 10px;
 }
-.ps__collapse {
+.ps__collapse,
+.ps__close {
   display: inline-grid;
   place-items: center;
   width: 30px;
@@ -81,7 +82,8 @@
   transition: background var(--pp-d-fast) var(--pp-ease),
               color var(--pp-d-fast) var(--pp-ease);
 }
-.ps__collapse:hover {
+.ps__collapse:hover,
+.ps__close:hover {
   background: var(--pp-border);
   color: var(--pp-text);
 }
@@ -301,8 +303,7 @@
 }
 
 /* ─── Collapsed mini-pill ────────────────────────────────────────────────── */
-/* Used when the viewer has voted and chosen to collapse the sheet so the */
-/* event feed underneath is visible. pointer-events is none on the wrapper */
+/* Used when the viewer collapses the sheet so the event feed stays visible. */
 /* so taps fall through to the feed; only the pill itself is interactive.  */
 
 .ps.ps--collapsed {
@@ -386,6 +387,24 @@
   min-width: 26px;
   text-align: right;
   flex-shrink: 0;
+}
+.ps-mini__close {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-surface-3);
+  color: var(--pp-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ps-mini__close:hover {
+  color: var(--pp-text);
+  background: var(--pp-border);
 }
 .ps-mini__chev {
   font-size: 14px;

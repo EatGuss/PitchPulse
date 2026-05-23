@@ -4,9 +4,6 @@
 # subscriptions fan out via @aws_subscribe over pure WebSockets (Amplify SDK
 # default). Auth: IAM via Cognito Identity Pool (unauthenticated role) for the
 # client; server-side Lambdas use their execution role's IAM credentials.
-#
-# Each subscription takes a matchId argument so clients can filter to the
-# single global room (MVP has one match — DFL-MAT-000001).
 
 schema {
   query: Query
@@ -48,7 +45,7 @@ type MatchEvent @aws_iam {
 # ─── Watch room reactions (Pillar 1: multiplayer) ────────────────────────────
 
 type RoomReaction @aws_iam {
-  matchId: ID!
+  roomId: ID!
   reactionId: ID!
   userId: ID!
   emoji: String!
@@ -63,6 +60,61 @@ type Vote @aws_iam {
   userId: ID!
   optionId: String!
   votedAt: AWSTimestamp!
+}
+
+# ─── Watch Room (private friend-group matchday) ──────────────────────────────
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  ENDED
+}
+
+type RoomMember @aws_iam {
+  userId: ID!
+  displayName: String!
+  joinedAt: AWSTimestamp!
+}
+
+type CreateRoomResult @aws_iam {
+  roomId: ID!
+  inviteCode: String!
+  roomName: String!
+  matchId: ID!
+  hostUserId: ID!
+  status: RoomStatus!
+  createdAt: AWSTimestamp!
+}
+
+type JoinRoomResult @aws_iam {
+  roomId: ID!
+  inviteCode: String!
+  roomName: String!
+  matchId: ID!
+  status: RoomStatus!
+  members: [RoomMember!]!
+  joinedMember: RoomMember!
+}
+
+type RoomComment @aws_iam {
+  roomId: ID!
+  commentId: ID!
+  promptId: ID!
+  userId: ID!
+  text: String!
+  ts: AWSTimestamp!
+}
+
+type RoomLeaderboardEntry @aws_iam {
+  userId: ID!
+  displayName: String!
+  coins: Int!
+}
+
+type RoomLeaderboardUpdate @aws_iam {
+  roomId: ID!
+  entries: [RoomLeaderboardEntry!]!
+  updatedAt: AWSTimestamp!
 }
 
 # ─── Inputs ──────────────────────────────────────────────────────────────────
@@ -97,7 +149,7 @@ input MatchEventInput {
 }
 
 input FireReactionInput {
-  matchId: ID!
+  roomId: ID!
   userId: ID!
   emoji: String!
 }
@@ -113,6 +165,42 @@ input StartMatchInput {
   matchId: ID!
 }
 
+input CreateRoomInput {
+  matchId: ID!
+  userId: ID!
+  displayName: String!
+}
+
+input JoinRoomInput {
+  inviteCode: String!
+  userId: ID!
+  displayName: String!
+}
+
+input PostCommentInput {
+  roomId: ID!
+  promptId: ID!
+  userId: ID!
+  text: String!
+}
+
+input LeaveRoomInput {
+  roomId: ID!
+  userId: ID!
+}
+
+input RoomLeaderboardUpdateInput {
+  roomId: ID!
+  entries: [RoomLeaderboardEntryInput!]!
+  updatedAt: AWSTimestamp!
+}
+
+input RoomLeaderboardEntryInput {
+  userId: ID!
+  displayName: String!
+  coins: Int!
+}
+
 type StartMatchResult @aws_iam {
   matchId: ID!
   startedAtWallMs: AWSTimestamp!
@@ -122,37 +210,33 @@ type StartMatchResult @aws_iam {
 # ─── Queries (minimal — used to bootstrap a late-joining client) ─────────────
 
 type Query @aws_iam {
-  # Returns nothing for MVP — placeholder so the schema has at least one Query.
   ping: String
 }
 
 # ─── Mutations ───────────────────────────────────────────────────────────────
 
 type Mutation @aws_iam {
-  # Client-callable: flip the match into the running state. The sim-emitter
-  # Lambda picks up the change on the next 2-second cron tick and starts
-  # writing events. Idempotent — calling again resets the timeline.
   startMatch(input: StartMatchInput!): StartMatchResult
 
-  # Client-callable: write a reaction to the room. Lambda resolver persists
-  # to pp-rooms then returns the reaction — that return triggers the
-  # roomReaction subscription via @aws_subscribe.
   fireReaction(input: FireReactionInput!): RoomReaction
 
-  # Client-callable: persist a vote to pp-prompts. Server-side validates the
-  # 30s window via the prompt META record. Returns the vote envelope.
   submitVote(input: SubmitVoteInput!): Vote
 
-  # Server-only: invoked by stream-handler Lambda to broadcast match clock
-  # ticks. NONE data source — payload echoed back to fire the subscription.
   publishMatchClock(input: MatchClockInput!): MatchClock
 
-  # Server-only: invoked by stream-handler Lambda to broadcast a single match
-  # event (goal, card, halfTime, etc).
   publishMatchEvent(input: MatchEventInput!): MatchEvent
+
+  # Watch Room — client-callable
+  createRoom(input: CreateRoomInput!): CreateRoomResult
+  joinRoom(input: JoinRoomInput!): JoinRoomResult
+  postComment(input: PostCommentInput!): RoomComment
+  leaveRoom(input: LeaveRoomInput!): Boolean
+
+  # Watch Room — server-only broadcast (Gate E wiring)
+  publishRoomLeaderboard(input: RoomLeaderboardUpdateInput!): RoomLeaderboardUpdate
 }
 
-# ─── Subscriptions (all subscribers filter by matchId argument) ──────────────
+# ─── Subscriptions ───────────────────────────────────────────────────────────
 
 type Subscription @aws_iam {
   matchClock(matchId: ID!): MatchClock
@@ -161,9 +245,18 @@ type Subscription @aws_iam {
   matchEvent(matchId: ID!): MatchEvent
     @aws_subscribe(mutations: ["publishMatchEvent"])
 
-  roomReaction(matchId: ID!): RoomReaction
+  roomReaction(roomId: ID!): RoomReaction
     @aws_subscribe(mutations: ["fireReaction"])
 
   voteSubmitted(matchId: ID!): Vote
     @aws_subscribe(mutations: ["submitVote"])
+
+  roomMemberJoined(roomId: ID!): JoinRoomResult
+    @aws_subscribe(mutations: ["joinRoom"])
+
+  roomComment(promptId: ID!, roomId: ID!): RoomComment
+    @aws_subscribe(mutations: ["postComment"])
+
+  roomLeaderboardUpdate(roomId: ID!): RoomLeaderboardUpdate
+    @aws_subscribe(mutations: ["publishRoomLeaderboard"])
 }

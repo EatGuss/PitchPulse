@@ -8,24 +8,31 @@
  *   - 'locked'   : window closed, "Waiting for resolution…", picks frozen
  *   - 'resolved' : winner badge, +N coin animation OR "No coins this round"
  *
- * Collapse-after-vote: once a viewer has locked in a pick (myPickedOptionId
- * is set), they can collapse the sheet to a thin pill at the bottom of the
- * phone — gives them back the event feed while the window runs out. The
- * vote is irrevocable, so collapsing isn't an escape hatch. We always auto-
- * expand on 'resolved' so the outcome can't be missed.
+ * Collapse: while a prompt is open or locked, the viewer can collapse the sheet
+ * to a thin pill at the bottom — with or without a vote — so the event feed stays
+ * visible. On resolved, voters are auto-expanded so the outcome can't be missed;
+ * if they sat out, they can collapse or close the result panel early.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PromptInstance } from '../domain/promptTypes';
+import type { RoomMember } from '../domain/watchRoomTypes';
 import { PROMPT_WINDOW_MS } from '../sim/promptEngine';
+import { LivePickReveal, type PickRevealMode } from './LivePickReveal';
+import { PromptCommentThread } from './PromptCommentThread';
 import './PromptSheet.css';
 
 export interface PromptSheetProps {
   prompt: PromptInstance | null;
   myPickedOptionId: string | null;
-  /** Used to look up the viewer's payout from prompt.payouts on resolution. */
   viewerId: string;
   onVote: (optionId: string) => boolean;
+  pickRevealMode?: PickRevealMode;
+  roomMembers?: RoomMember[];
+  /** When set, enables Watch Room comment thread on this prompt. */
+  roomId?: string;
+  /** Freezes the vote countdown while the match sim is paused. */
+  matchPaused?: boolean;
 }
 
 const WINDOW_REAL_SEC = PROMPT_WINDOW_MS / 1000;
@@ -106,21 +113,36 @@ function OptionButton({
   );
 }
 
-export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: PromptSheetProps) {
+export function PromptSheet({
+  prompt,
+  myPickedOptionId,
+  viewerId,
+  onVote,
+  pickRevealMode = 'both-voted',
+  roomMembers = [],
+  roomId,
+  matchPaused = false,
+}: PromptSheetProps) {
   // Auto-dismiss the resolved overlay shortly after resolution.
   // (The engine clears `active` after 3.2s; we fade out a touch earlier.)
   const [dismissed, setDismissed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   // Tap-to-show rules popover (mobile-first: no hover-only tooltips per spec).
   const [helpOpen, setHelpOpen] = useState(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frozenSecondsRef = useRef<number | null>(null);
   // Wall-clock tick so the countdown ring updates smoothly even when no
   // engine event fires (the engine ticks at sim cadence; this drives UI).
   const [, setNowMs] = useState(Date.now());
   useEffect(() => {
-    if (!prompt || prompt.state !== 'open') return;
+    if (!prompt || prompt.state !== 'open' || matchPaused) return;
     const t = setInterval(() => setNowMs(Date.now()), 100);
     return () => clearInterval(t);
-  }, [prompt?.id, prompt?.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prompt?.id, prompt?.state, matchPaused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!matchPaused) frozenSecondsRef.current = null;
+  }, [matchPaused]);
 
   useEffect(() => {
     if (!prompt) {
@@ -130,13 +152,17 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
       return;
     }
     if (prompt.state === 'resolved') {
-      // Force-expand so the viewer sees the outcome no matter how they left it.
-      setCollapsed(false);
+      // Voters always see the full result; sit-outs can close or collapse it.
+      if (myPickedOptionId !== null) {
+        setCollapsed(false);
+      }
       setHelpOpen(false);
-      const t = setTimeout(() => setDismissed(true), 2900);
-      return () => clearTimeout(t);
+      dismissTimerRef.current = setTimeout(() => setDismissed(true), 2900);
+      return () => {
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      };
     }
-  }, [prompt?.state, prompt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prompt?.state, prompt?.id, myPickedOptionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fresh prompt → fresh expanded view. (Same component instance re-renders
   // for back-to-back prompts; without this the "collapsed" / "helpOpen"
@@ -149,8 +175,13 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
   const visible = !!prompt && !dismissed;
   const secondsLeft = useMemo(() => {
     if (!prompt) return 0;
-    return Math.max(0, (prompt.closesAtWallMs - Date.now()) / 1000);
-  }, [prompt?.closesAtWallMs, prompt?.serverMinute]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (matchPaused && frozenSecondsRef.current !== null) {
+      return frozenSecondsRef.current;
+    }
+    const sec = Math.max(0, (prompt.closesAtWallMs - Date.now()) / 1000);
+    if (matchPaused) frozenSecondsRef.current = sec;
+    return sec;
+  }, [prompt?.closesAtWallMs, prompt?.serverMinute, matchPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!prompt) return null;
 
@@ -163,12 +194,33 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
   // This sheet only narrates the result.)
 
   const pickedOption = prompt.options.find((o) => o.id === myPickedOptionId) ?? null;
-  // Collapse is available only AFTER you've voted, and only while the prompt
-  // is still in flight (open or locked). Resolved view is always full-panel.
-  const canCollapse = !!pickedOption && (prompt.state === 'open' || prompt.state === 'locked');
+  const satOut = myPickedOptionId === null;
+  const canCollapse =
+    prompt.state === 'open' || prompt.state === 'locked' || (prompt.state === 'resolved' && satOut);
+  const canClose = prompt.state === 'resolved' && satOut;
+
+  const onDismiss = () => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    setDismissed(true);
+  };
 
   // ── Collapsed view: thin pill at the bottom, lets the event feed breathe.
-  if (visible && collapsed && canCollapse && pickedOption) {
+  if (visible && collapsed && canCollapse) {
+    const miniLabel =
+      prompt.state === 'resolved'
+        ? 'RESULT'
+        : pickedOption && prompt.state === 'open'
+          ? 'YOUR PICK · LIVE'
+          : pickedOption && prompt.state === 'locked'
+            ? 'YOUR PICK · LOCKED'
+            : prompt.state === 'open'
+              ? 'LIVE PROMPT'
+              : 'PROMPT · LOCKED';
+    const miniDetail =
+      prompt.state === 'resolved'
+        ? 'You sat this one out'
+        : pickedOption?.label ?? prompt.copy;
+
     return (
       <div className="ps ps--collapsed is-visible" role="region" aria-label="Active prediction (collapsed)">
         <button
@@ -179,15 +231,27 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
         >
           <span className="ps-mini__state" data-state={prompt.state} aria-hidden="true" />
           <span className="ps-mini__txt">
-            <span className="ps-mini__label">{prompt.state === 'open' ? 'YOUR PICK · LIVE' : 'YOUR PICK · LOCKED'}</span>
-            <span className="ps-mini__option">{pickedOption.label}</span>
+            <span className="ps-mini__label">{miniLabel}</span>
+            <span className="ps-mini__option">{miniDetail}</span>
           </span>
           {prompt.state === 'open' ? (
             <span className="ps-mini__timer tabular" aria-label={`${Math.ceil(secondsLeft)} seconds left`}>
               {Math.max(0, Math.ceil(secondsLeft))}s
             </span>
-          ) : (
+          ) : prompt.state === 'locked' ? (
             <span className="ps-mini__timer" aria-hidden="true">🔒</span>
+          ) : (
+            <button
+              type="button"
+              className="ps-mini__close"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss();
+              }}
+              aria-label="Close result"
+            >
+              ✕
+            </button>
           )}
           <span className="ps-mini__chev" aria-hidden="true">↑</span>
         </button>
@@ -215,16 +279,28 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
             ) : (
               <span className="ps__votes tabular">{totalVotes} votes</span>
             )}
-            {canCollapse && (
+            {canClose ? (
               <button
                 type="button"
-                className="ps__collapse"
-                onClick={() => setCollapsed(true)}
-                aria-label="Collapse prediction"
-                title="Collapse"
+                className="ps__close"
+                onClick={onDismiss}
+                aria-label="Close result"
+                title="Close"
               >
-                ↓
+                ✕
               </button>
+            ) : (
+              canCollapse && (
+                <button
+                  type="button"
+                  className="ps__collapse"
+                  onClick={() => setCollapsed(true)}
+                  aria-label="Collapse prediction"
+                  title="Collapse"
+                >
+                  ↓
+                </button>
+              )
             )}
           </div>
         </div>
@@ -284,6 +360,24 @@ export function PromptSheet({ prompt, myPickedOptionId, viewerId, onVote }: Prom
             );
           })}
         </div>
+
+        {prompt && (
+          <LivePickReveal
+            prompt={prompt}
+            viewerId={viewerId}
+            mode={pickRevealMode}
+            members={roomMembers}
+          />
+        )}
+
+        {roomId && (
+          <PromptCommentThread
+            roomId={roomId}
+            prompt={prompt}
+            viewerId={viewerId}
+            members={roomMembers}
+          />
+        )}
 
         {prompt.state === 'open' && (
           <p className="ps__hint">

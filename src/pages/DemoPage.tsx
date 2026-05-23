@@ -1,17 +1,13 @@
 /**
  * DemoPage — `/demo` route. Two phone frames side-by-side, shared MatchSim.
  *
- * Layout target: 1920×1080 desktop (demo-video screen). Both phones AT their
- * full 390×844 logical size, with the SimControls panel between them. Auto-
- * scales on smaller viewports via PhoneFrame's transform-scale rules.
- *
- * This is the screen that proves the multiplayer pillar in the demo video.
+ * Each phone: onboarding → ModePicker → Public Match (or Watch Room stub).
  */
 
 import { PhoneFrame } from '../components/PhoneFrame';
 import { SimControls } from '../components/SimControls';
 import { DataDisclosure } from '../components/DataDisclosure';
-import { MatchPage } from './MatchPage';
+import { PhoneEntryFlow } from './PhoneEntryFlow';
 import { DEMO_USERS } from '../data/personas';
 import { teamAlias } from '../data/teamAliases';
 import './DemoPage.css';
@@ -38,7 +34,7 @@ export function DemoPage() {
 
       <div className="demo__stage">
         <PhoneFrame label={`${alice.displayName} — ${aliceTeam.full} fan`} subLabel={alice.archetypeName}>
-          <MatchPage userId="alice" hideSimControls />
+          <PhoneEntryFlow hideSimControls />
         </PhoneFrame>
 
         <div className="demo__bridge">
@@ -63,7 +59,7 @@ export function DemoPage() {
         </div>
 
         <PhoneFrame label={`${bob.displayName} — ${bobTeam.full} fan`} subLabel={bob.archetypeName}>
-          <MatchPage userId="bob" hideSimControls />
+          <PhoneEntryFlow hideSimControls />
         </PhoneFrame>
       </div>
 

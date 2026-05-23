@@ -1,0 +1,46 @@
+.lpr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lpr__badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--pp-text);
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: 999px;
+  animation: lpr-in var(--pp-d-med) var(--pp-ease);
+}
+
+@keyframes lpr-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lpr__name {
+  font-weight: 800;
+}
+
+.lpr__verb {
+  color: var(--pp-text-muted);
+  font-weight: 600;
+}
+
+.lpr__pick {
+  font-weight: 800;
+  color: var(--pp-accent);
+}

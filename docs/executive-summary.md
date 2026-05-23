@@ -36,8 +36,8 @@ Three phone-frame screenshots side-by-side (390×844 logical, scaled to fit). Ca
 | Screen | Caption (small text under each phone) |
 |---|---|
 | Matchday view (mid-match) | Live event feed · score chip · profile pill · streak chip |
-| Prompt overlay (open + countdown ring) | 5-second answer window · live vote-share % · "How rewards work" tooltip |
-| Resolved + leaderboard | `+N` coin animation · winning option highlighted · leaderboard reordered |
+| Prompt overlay (open + countdown ring) | 5-second answer window · live vote-share % · **Comments** thread |
+| Watch Room sidebar + live pick reveal | *"Bob picked Home"* · room leaderboard · invite-code lobby |
 
 **On-slide footnote:**
 > Built as a **mobile-first web app** in React + Vite + TypeScript, rendered inside a 390×844 phone frame on the demo desktop. CSS tokens map 1:1 to React Native style objects — the Expo lift-and-shift is a slide-5 next step.
@@ -94,9 +94,9 @@ hackathon-data S3                EventBridge (1-min cron)
 Four numbered panels in a 2×2 grid. Each panel: a small screenshot + a one-line caption.
 
 1. **Kick-off** — both phones light up with the same event card within 200 ms. → **Pillar 2: real-time data**
-2. **Prompt vote** — Alice picks A, Bob picks B. Vote-share % bars update on both screens. → **Pillar 1: multiplayer**
-3. **Resolution + coin animation** — winning option goes green; `+12c` floats up from the coin balance. Leaderboard reorders. → **Pillar 3: gamification**
-4. **Reaction broadcast** — 🔥 from Alice puffs up on Bob's phone with Alice's avatar attached. → **Pillar 1 again: multiplayer**
+2. **Watch Room join** — Bob creates `PLZ-XXX`, Alice enters code, host starts match. → **Pillar 1: multiplayer**
+3. **Live pick + comment** — Alice votes, Bob sees the pick instantly; both post in the prompt thread. → **Pillar 1 again**
+4. **Resolution + room sidebar** — winning option green; `+12c` floats up; room leaderboard reorders. → **Pillar 3: gamification**
 
 **Footer line:** Demo video records this exact flow on the `/demo` route at 1920×1080. Total runtime ≤ 3:00.
 
@@ -114,7 +114,7 @@ Three columns:
 - **TV / Apple TV companion app** sharing the same AppSync subscriptions.
 
 **Product**
-- **Private watch rooms** — invite-link gated, room-scoped subscriptions. Backend keys already room-scoped (`ROOM#<match_id>`), one filter change away.
+- **Cross-browser Watch Rooms** — invite-code rooms ship in MVP; extend to multi-device sessions beyond the `/demo` tab.
 - **Spielmacher squad loop** — squad management, packs, trading, wages from PITCHPULSE.md §6.4–6.6. Explicitly Tier 2; deferred per MVP scope.
 - **Late-joiner backfill** — `recentEvents` query on mount so refreshing mid-match restores the EventFeed.
 - **Push notifications** — SES/SNS to wake fans for marquee fixtures.

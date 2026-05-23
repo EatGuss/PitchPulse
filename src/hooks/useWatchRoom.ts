@@ -1,34 +1,47 @@
 /**
  * useWatchRoom — subscribes a component to the WatchRoomEngine's reaction stream.
  *
- * Returns the bounded list of recent reactions (newest-first) and a stable
- * `fireReaction(emoji)` bound to the calling viewer. ReactionStream renders
- * transient puffs off this list, ReactionBar calls fireReaction on tap.
+ * When `roomId` is set (private Watch Room), reactions also broadcast via
+ * AppSync using that room id. Public match passes no roomId and uses the
+ * in-memory engine only (or matchId-as-roomId in AWS public mode).
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { awsFireReaction, ensureWatchRoomReactionBridge } from '../aws/bridge';
+import { isAwsMode } from '../aws/config';
 import {
   getWatchRoomEngine,
   type ReactionEmoji,
   type ReactionEvent,
 } from '../sim/watchRoomEngine';
 
+export interface UseWatchRoomOptions {
+  roomId?: string;
+  memberIds?: string[];
+}
+
 export interface UseWatchRoomResult {
   reactions: ReactionEvent[];
-  /** Fire a reaction as the calling viewer. Returns the emitted event or null on rejection. */
   fireReaction: (emoji: ReactionEmoji) => ReactionEvent | null;
   members: string[];
 }
 
-export function useWatchRoom(viewerId: string): UseWatchRoomResult {
+export function useWatchRoom(viewerId: string, options: UseWatchRoomOptions = {}): UseWatchRoomResult {
+  const { roomId, memberIds } = options;
   const room = getWatchRoomEngine();
+  const memberKey = memberIds?.slice().sort().join(',') ?? '';
   const [reactions, setReactions] = useState<ReactionEvent[]>(() => room.getReactions());
   const [members, setMembers] = useState<string[]>(() => room.getMembers());
 
   useEffect(() => {
-    // Join on mount so badges that gate on room membership fire correctly.
-    room.join(viewerId);
-    setMembers(room.getMembers());
+    if (memberIds && memberIds.length > 0) {
+      room.setMembers(memberIds);
+      room.setRoomId(roomId ?? null);
+      setMembers(room.getMembers());
+    } else {
+      room.join(viewerId);
+      setMembers(room.getMembers());
+    }
 
     const offs = [
       room.bus.on('reaction', () => setReactions(room.getReactions())),
@@ -36,11 +49,28 @@ export function useWatchRoom(viewerId: string): UseWatchRoomResult {
       room.bus.on('reset', () => setReactions(room.getReactions())),
     ];
     return () => offs.forEach((off) => off());
-  }, [room, viewerId]);
+  }, [room, viewerId, roomId, memberKey]);
+
+  useEffect(() => {
+    if (!roomId || !isAwsMode) return;
+    ensureWatchRoomReactionBridge(roomId);
+  }, [roomId]);
 
   const fireReaction = useCallback(
-    (emoji: ReactionEmoji) => room.fireReaction(viewerId, emoji),
-    [room, viewerId],
+    (emoji: ReactionEmoji) => {
+      const targetRoomId = roomId ?? room.getRoomId();
+
+      // AWS: broadcast via AppSync only — subscription injects one puff for all viewers.
+      if (isAwsMode && targetRoomId) {
+        void awsFireReaction(targetRoomId, viewerId, emoji).catch((err) => {
+          console.error('[useWatchRoom] fireReaction failed', err);
+        });
+        return null;
+      }
+
+      return room.fireReaction(viewerId, emoji);
+    },
+    [room, viewerId, roomId],
   );
 
   return { reactions, fireReaction, members };

@@ -4,7 +4,7 @@ Real-time social Bundesliga matchday companion — submission for the **DFL × A
 
 Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchCoin economy, a leaderboard, and badges — all reacting to a replayed Bundesliga match in real time.
 
-> **Status:** MVP complete through Gate 5 (polish & submission). See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
+> **Status:** MVP complete through Gate 5 (polish & submission). **Watch Room mode** shipped on `feature/watch-room` (Gates A–G). See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
 
 ---
 
@@ -15,6 +15,7 @@ Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchC
 - [Architecture (Gate 4)](#architecture-gate-4)
 - [How to run locally](#how-to-run-locally)
 - [How to deploy to AWS](#how-to-deploy-to-aws)
+- [Watch Room mode](#watch-room-mode)
 - [How to demo this](#how-to-demo-this)
 - [Build status (gates)](#build-status-gates)
 - [Project decisions worth knowing](#project-decisions-worth-knowing)
@@ -26,7 +27,7 @@ Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchC
 
 ## The three pillars
 
-1. **Multiplayer** — two demo users (Alice, Bob) share one watch room. Both see each other's votes, reactions, leaderboard positions, and the same match events at the same moment.
+1. **Multiplayer** — two demo users (Alice, Bob) share a matchday session. In **Watch Room** mode they join a private room by invite code; picks reveal live, reactions and comments broadcast room-scoped. In **Public Match** mode picks stay hidden until both have voted.
 2. **Real-time data** — a replay emitter reads the anonymized DFL match XML and ticks events out on an accelerated clock (1 match-minute ≈ 2 real seconds). Goal, card, **and** half-time events drive UI changes — plus offside, corner, foul, shot-saved/blocked/missed for richness.
 3. **Gamification** — PitchCoin economy, live leaderboard, collectible badges, streak chip. Correct predictions earn `base_reward × min(1 / your_vote_share, 5.0)` coins. Wrong predictions cost zero — **never negative, never real money**.
 
@@ -83,6 +84,8 @@ A persistent disclosure line is rendered on both `/demo` and `/` pages (and on t
                               │   • publishMatchClock  ── @aws_subscribe ──▶ │
                               │   • publishMatchEvent  ── @aws_subscribe ──▶ │
                               │   • fireReaction        (DDB pp-rooms)       │
+                              │   • createRoom / joinRoom / postComment      │
+                              │     leaveRoom           (pp-room-handler λ)  │
                               │   • submitVote          (DDB pp-prompts)     │
                               │   • startMatch          (Lambda)             │
                               └──────────────────────┬───────────────────────┘
@@ -102,7 +105,7 @@ A persistent disclosure line is rendered on both `/demo` and `/` pages (and on t
 | `pp-users` | `USER#<id>` | `PROFILE` / `STREAK` / `BADGE#<id>` / `COIN_LEDGER#<ts>` | No Streams |
 | `pp-matches` | `MATCH#<id>` | `CLOCK` / `EVENT#<seq>` | Streams `NEW_AND_OLD_IMAGES` |
 | `pp-prompts` | `PROMPT#<id>` | `META` / `VOTE#<user>` / `RESOLUTION` | TTL on `expiresAt` (24h) |
-| `pp-rooms` | `ROOM#<match_id>` | `MEMBER#<user>` / `REACTION#<ts>` | TTL on `expiresAt` (24h) |
+| `pp-rooms` | `ROOM#<room_id>` | `META` / `MEMBER#<user>` / `REACTION#<ts>` / `COMMENT#<ts>` | `InviteCodeIndex` GSI; TTL on `expiresAt` (24h) |
 
 **Auth:** Cognito Identity Pool, anonymous guest role. Two pre-created demo IDs (`alice`, `bob`) — no signup, no email, no PII.
 
@@ -152,7 +155,7 @@ Then open:
 - **`http://127.0.0.1:5173/demo`** — the two-phone side-by-side stage used for the demo recording.
 - `http://127.0.0.1:5173/` — single-phone view. You'll see the onboarding screen first; tap **Continue as Alice** (or Bob). Add `?as=bob` to deep-link past onboarding, `?frame=off` for raw mobile preview at 390px.
 
-Hit **▶ Kick off** in the demo stage controls and the whole match plays in ~3 minutes.
+After onboarding, the **Mode Picker** offers **Public Match** or **Watch Room**. On `/demo`, complete onboarding on both phones, then follow the [Watch Room demo flow](#watch-room-mode) or hit **▶ Kick off** in the center control bar for a quick Public Match replay (~3 minutes).
 
 ### Run modes (AWS vs local)
 
@@ -162,6 +165,48 @@ The frontend auto-detects whether AWS variables are set in `.env.local`:
 - **AWS mode** (CDK outputs filled in): the React frontend uses Amplify to subscribe to AppSync. **▶ Kick off** invokes the `startMatch` mutation; the live sim runs in Lambda + DynamoDB Streams. Both phones receive the same WebSocket fan-out.
 
 The challenge brief explicitly allows "a local running app with API calls to AWS" — both modes are valid demo paths.
+
+Without AWS env vars, Watch Room create/join/comment/reaction sync still works on `/demo` via an in-memory `localRoomStore` so both phone frames share the same tab-local room state.
+
+---
+
+## Watch Room mode
+
+Private invite-code rooms for friends watching the same replay together.
+
+### Flow
+
+```
+Onboarding → Mode Picker → Watch Room
+  → Create Room  → lobby (host sees invite code)
+  → Enter Code   → join as guest
+  → Start Match  → both phones enter MatchPage with room context
+```
+
+### What’s different from Public Match
+
+| Feature | Public Match | Watch Room |
+|---|---|---|
+| Pick reveal | Hidden until **both** users vote | **Live** — “Bob picked Home” as soon as they tap |
+| Leaderboard | Horizontal strip under score | **Room sidebar** with member balances |
+| Reactions | Broadcast to match scope | Room-scoped; deduped per screen |
+| Comments | — | **140-char plain-text threads** on each prompt (`postComment` / `roomComment`) |
+| Pause | Center **❚❚ Pause** freezes clock, prompts, and AWS injects | Same |
+
+### Invite codes
+
+- Format: `XXX-XXX` (e.g. `PLZ-482`). Tap the code card in the lobby to copy.
+- Backend: `createRoom` / `joinRoom` mutations on AppSync → `pp-room-handler` Lambda → `pp-rooms` DynamoDB.
+- Local fallback: `src/sim/localRoomStore.ts` when `VITE_APPSYNC_URL` is unset.
+
+### Key files
+
+| Area | Paths |
+|---|---|
+| Entry + lobby | `WatchRoomFlow`, `WatchRoomEntry`, `WatchRoomLobby` |
+| In-room UI | `RoomMemberSidebar`, `LivePickReveal`, `PromptCommentThread` |
+| AWS client | `src/aws/roomClient.ts` |
+| Cross-phone demo sync | `src/sim/watchRoomCoordination.ts`, `localRoomStore.ts` |
 
 ---
 
@@ -228,18 +273,18 @@ S3 + CloudFront frontend hosting is **deferred** per the brief ("a local running
 
 ## How to demo this
 
-Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). The short version:
+Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). The short version (Watch Room cut):
 
-1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames must be visible top-to-bottom.
-2. Confirm the **Alice — FC Bayern fan** and **Bob — Borussia Dortmund fan** labels are above each phone.
-3. Start the screen recording (1920×1080, 30 fps).
-4. Click **▶ Kick off** on the middle control bar. The clock starts counting.
-5. **Pillar 2 (real-time):** point to the matching event card lighting up on both phones simultaneously.
-6. **Pillar 1 (multiplayer):** when a prompt sheet slides up, vote on Alice's frame, then vote differently on Bob's frame. The vote-share % updates live on both.
-7. **Pillar 3 (gamification):** wait for the prompt to resolve. The winning voter's coin balance animates a `+N` chip in the top-right. The leaderboard reorders within ~200 ms.
-8. **Reactions:** tap a 🔥 on Alice's phone → emoji puff floats up on **both** phones.
-9. **Half-time:** wait for the 45' whistle. The phase chip flips to "Half time"; the half-time badge fires for anyone who voted on the HT prompt.
-10. Stop recording at ≤ 3:00. Trim, add the on-screen text overlays from the demo-script doc, export `presentation_video.mp4`.
+1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames visible top-to-bottom.
+2. Complete onboarding on both phones → **Mode Picker**.
+3. **Bob** taps **Watch Room** → **Create Room** → note the invite code (e.g. `PLZ-482`).
+4. **Alice** taps **Watch Room** → **Enter Code** → joins Bob’s lobby. Bob taps **Start Match**.
+5. Click **▶ Kick off** on the center control bar. Both phones tick together.
+6. **Pillar 2:** same event card on both phones within ~200 ms.
+7. **Pillar 1:** prompt fires → Alice votes → Bob sees live pick reveal → Bob votes differently → expand **Comments**, post a 140-char line on both phones.
+8. **Pillar 3:** resolution → coin animation → room sidebar reorders by balance.
+9. **Reactions:** 🔥 from Alice puffs on Bob’s screen.
+10. **Full-time:** room sidebar shows final standings. Stop at ≤ 3:00; add overlays from the demo script; export `presentation_video.mp4`.
 
 ### Locked-in recording rules
 
@@ -258,6 +303,16 @@ Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). 
 - [x] **Gate 3** — Watch room reactions, leaderboard, badges, streak chip
 - [x] **Gate 4** — AWS deploy: AppSync + Lambda + DynamoDB + EventBridge + Cognito via CDK
 - [x] **Gate 5** — Onboarding, tooltip polish, README, demo script, executive summary, jumbotron concept
+
+**Watch Room feature (`feature/watch-room`):**
+
+- [x] **Gate A** — Bootstrap check (git, AWS stack, dev server)
+- [x] **Gate B** — Mode Picker (Public Match vs Watch Room)
+- [x] **Gate C** — `pp-rooms` extensions + AppSync schema + `pp-room-handler` Lambda
+- [x] **Gate D** — Create/join flow + lobby
+- [x] **Gate E** — In-room match UX (sidebar, live picks, reactions)
+- [x] **Gate F** — Comment threads on prompts
+- [x] **Gate G** — Polish, README/demo-script update, final deploy, verify
 
 ---
 
@@ -280,7 +335,7 @@ Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). 
 These are explicitly out-of-scope for the MVP but designed for:
 
 - **Squad management, packs, trading, wages** — the full "Spielmacher" loop from PITCHPULSE.md §6.4–6.6.
-- **Private watch rooms** — currently one global room; the schema and DDB key layout support room-scoped subscriptions with a one-line filter change.
+- **Cross-device Watch Rooms** — `/demo` syncs two phones in one tab; true multi-browser rooms need shared AWS subscriptions (backend already supports this).
 - **Stadium jumbotron mode** — see [`docs/jumbotron-concept.png`](./docs/jumbotron-concept.png). PitchPulse leaderboard rendered as a between-possessions tile on the in-stadium screen.
 - **React Native / Expo migration** — the phone-frame web app was built to be lift-and-shift to RN once the design is locked. CSS tokens map 1:1 to React Native style objects; no DOM-only APIs in the engines.
 - **Step Functions, SQS FIFO, WAF, X-Ray, SES/SNS push** — listed in the brief but not on the MVP critical path.

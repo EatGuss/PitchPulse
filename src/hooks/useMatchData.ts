@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import type { MatchInfo } from '../domain/types';
 import { getMatchSim } from '../sim/matchSim';
+import { setMatchTeamNames } from '../data/teamAliases';
 import { getPromptEngine } from '../sim/promptEngine';
 import { getWatchRoomEngine } from '../sim/watchRoomEngine';
 import { getBadgeEngine } from '../sim/badgeEngine';
@@ -48,6 +49,7 @@ export function useMatchData(): MatchDataState {
       try {
         const [info] = await Promise.all([loadMatchInfo(), getMatchSim().load()]);
         if (cancelled) return;
+        setMatchTeamNames(info.teams);
         // Attach all engines once match info is known. Each attach() is
         // idempotent — both phone frames mount this hook and that's safe.
         // Order matters: PromptEngine binds the sim clock; WatchRoom owns

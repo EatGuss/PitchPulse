@@ -22,6 +22,8 @@ export interface SimEventMap extends Record<string, unknown> {
   event: NormalizedEvent;
   /** Fired once when the sim is started (after events.json is loaded). */
   ready: { totalEvents: number };
+  /** Fired when the demo controls reset the replay. */
+  reset: void;
   /** Fired once when the sim reaches the final fullTime event. */
   end: { finalScore: { home: number; guest: number } };
 }
@@ -69,6 +71,8 @@ export class MatchSim {
    * downstream consumer (feed, prompts, badges, reactions) individually.
    */
   private seenEventIds = new Set<string>();
+  /** True while the demo Pause control has frozen the replay. */
+  private paused = false;
 
   /** Fetches the prebuilt events.json. Idempotent. */
   async load(): Promise<void> {
@@ -86,31 +90,71 @@ export class MatchSim {
       throw new Error('MatchSim.start() called before load() — call await sim.load() first.');
     }
     if (this.intervalHandle) return; // already running
-    this.startedAt = performance.now();
-    this.cursor = 0;
-    this.state = {
-      matchMinute: 0,
-      displayClock: "0'",
-      phase: 'preMatch',
-      score: { home: 0, guest: 0 },
-      isRunning: true,
-    };
+
+    this.paused = false;
+
+    const freshKickoff = this.startedAt === null || this.state.phase === 'preMatch';
+
+    if (freshKickoff) {
+      this.startedAt = performance.now();
+      this.cursor = 0;
+      this.state = {
+        matchMinute: 0,
+        displayClock: "0'",
+        phase: 'preMatch',
+        score: { home: 0, guest: 0 },
+        isRunning: true,
+      };
+    } else {
+      // Resume after pause — preserve cursor and wall-clock anchor.
+      const elapsedMatchMin = this.state.matchMinute;
+      this.startedAt = performance.now() - elapsedMatchMin * SECONDS_PER_MATCH_MINUTE * 1000;
+      this.state = { ...this.state, isRunning: true };
+    }
+
     this.bus.emit('clock', this.state);
     this.intervalHandle = setInterval(this.tick, TICK_INTERVAL_MS);
   }
 
   pause(): void {
-    if (!this.intervalHandle) return;
-    clearInterval(this.intervalHandle);
-    this.intervalHandle = null;
+    if (this.paused || !this.state.isRunning) return;
+    if (this.intervalHandle !== null) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+    this.paused = true;
     this.state = { ...this.state, isRunning: false };
     this.bus.emit('clock', this.state);
   }
 
+  /** Resume after pause — local tick loop or AWS subscription unfreeze. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.startedAt === null && this.state.phase === 'preMatch') {
+      this.start();
+      return;
+    }
+    this.state = { ...this.state, isRunning: true };
+    this.bus.emit('clock', this.state);
+    if (this.loaded && this.intervalHandle === null && this.startedAt !== null) {
+      this.startedAt = performance.now() - this.state.matchMinute * SECONDS_PER_MATCH_MINUTE * 1000;
+      this.intervalHandle = setInterval(this.tick, TICK_INTERVAL_MS);
+    }
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   reset(): void {
-    this.pause();
+    if (this.intervalHandle !== null) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
     this.cursor = 0;
     this.startedAt = null;
+    this.paused = false;
     this.hasBootstrappedScore = false;
     this.seenEventIds.clear();
     this.state = {
@@ -121,6 +165,11 @@ export class MatchSim {
       isRunning: false,
     };
     this.bus.emit('clock', this.state);
+    this.bus.emit('reset', undefined);
+    if (this.loaded) {
+      // Cascade reset to prompt engine, event feed, badges, and reactions.
+      this.bus.emit('ready', { totalEvents: this.events.length });
+    }
   }
 
   getState(): MatchClockState {
@@ -150,6 +199,7 @@ export class MatchSim {
    * that. The score then moves only when injectEvent() processes a goal.
    */
   injectClock(state: MatchClockState): void {
+    if (this.paused) return;
     const score = this.hasBootstrappedScore ? this.state.score : state.score;
     this.hasBootstrappedScore = true;
     this.state = { ...state, score };
@@ -167,6 +217,7 @@ export class MatchSim {
    * single render — the score change and the goal card appear together.
    */
   injectEvent(event: NormalizedEvent): void {
+    if (this.paused) return;
     if (this.seenEventIds.has(event.id)) return;
     this.seenEventIds.add(event.id);
 
@@ -207,7 +258,6 @@ export class MatchSim {
       }
     }
 
-    // Compute display state from latest matchMinute + latest known phase from events.
     const phase = this.derivePhase(matchMinute);
     this.state = {
       ...this.state,
