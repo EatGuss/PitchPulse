@@ -11,7 +11,7 @@
  * Collapse: while a prompt is open or locked, the viewer can collapse the sheet
  * to a thin pill at the bottom — with or without a vote — so the event feed stays
  * visible. On resolved, voters are auto-expanded so the outcome can't be missed;
- * if they sat out, they can collapse or close the result panel early.
+ * if they sat out, they can collapse the result pill; it auto-dismisses after a few seconds.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -152,7 +152,7 @@ export function PromptSheet({
       return;
     }
     if (prompt.state === 'resolved') {
-      // Voters always see the full result; sit-outs can close or collapse it.
+      // Voters always see the full result; everyone auto-dismisses shortly after.
       if (myPickedOptionId !== null) {
         setCollapsed(false);
       }
@@ -197,7 +197,6 @@ export function PromptSheet({
   const satOut = myPickedOptionId === null;
   const canCollapse =
     prompt.state === 'open' || prompt.state === 'locked' || (prompt.state === 'resolved' && satOut);
-  const canClose = prompt.state === 'resolved' && satOut;
 
   const onDismiss = () => {
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
@@ -240,19 +239,7 @@ export function PromptSheet({
             </span>
           ) : prompt.state === 'locked' ? (
             <span className="ps-mini__timer" aria-hidden="true">🔒</span>
-          ) : (
-            <button
-              type="button"
-              className="ps-mini__close"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDismiss();
-              }}
-              aria-label="Close result"
-            >
-              ✕
-            </button>
-          )}
+          ) : null}
           <span className="ps-mini__chev" aria-hidden="true">↑</span>
         </button>
       </div>
@@ -279,28 +266,16 @@ export function PromptSheet({
             ) : (
               <span className="ps__votes tabular">{totalVotes} votes</span>
             )}
-            {canClose ? (
+            {canCollapse && (
               <button
                 type="button"
-                className="ps__close"
-                onClick={onDismiss}
-                aria-label="Close result"
-                title="Close"
+                className="ps__collapse"
+                onClick={() => setCollapsed(true)}
+                aria-label="Collapse prediction"
+                title="Collapse"
               >
-                ✕
+                ↓
               </button>
-            ) : (
-              canCollapse && (
-                <button
-                  type="button"
-                  className="ps__collapse"
-                  onClick={() => setCollapsed(true)}
-                  aria-label="Collapse prediction"
-                  title="Collapse"
-                >
-                  ↓
-                </button>
-              )
             )}
           </div>
         </div>
