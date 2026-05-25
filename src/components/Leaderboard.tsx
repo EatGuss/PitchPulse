@@ -1,7 +1,7 @@
 /**
  * Leaderboard — compact two-row strip rendered between MatchHeader and
  * EventFeed. Always visible during the match so judges can see it reorder in
- * real time as coins land (the "reorders within 2s" success criterion).
+ * real time as match points land (the "reorders within 2s" success criterion).
  *
  * Rows reorder via CSS view-transition-name when supported; everywhere else
  * the change is instantaneous. Both work — the engine fires fast enough that
@@ -55,10 +55,10 @@ export function Leaderboard({ viewerId }: LeaderboardProps) {
                   🔥 {r.streak}
                 </span>
               )}
-              <span className="lb__coins tabular" aria-label={`${r.coinBalance} PitchCoins`}>
-                <span className="lb__coins-icon" aria-hidden="true">●</span>
-                {formatter.format(r.coinBalance)}
-                <span className="lb__coins-suffix">pts</span>
+              <span className="lb__points tabular" aria-label={`${r.matchPoints} PitchPoints`}>
+                <span className="lb__points-icon" aria-hidden="true">●</span>
+                {formatter.format(r.matchPoints)}
+                <span className="lb__points-suffix">pts</span>
               </span>
             </li>
           );

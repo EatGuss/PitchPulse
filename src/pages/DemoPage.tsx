@@ -53,7 +53,7 @@ export function DemoPage() {
             <div className="demo__pillar">
               <div className="demo__pillar-label">PILLAR 3</div>
               <div className="demo__pillar-name">Gamification</div>
-              <div className="demo__pillar-desc">PitchCoins · odds × correctness · badges</div>
+              <div className="demo__pillar-desc">PitchPoints · odds × correctness · badges</div>
             </div>
           </div>
         </div>

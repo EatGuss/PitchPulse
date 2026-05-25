@@ -204,13 +204,13 @@
   text-overflow: ellipsis;
 }
 
-.rms__coins {
+.rms__points {
   font-size: 11px;
   font-weight: 800;
   color: var(--pp-warning);
 }
 
-.rms__coins-suffix {
+.rms__points-suffix {
   font-size: 9px;
   font-weight: 700;
   color: var(--pp-text-muted);

@@ -99,7 +99,7 @@
   color: var(--pp-warning);
 }
 
-.lb__coins {
+.lb__points {
   display: inline-flex;
   align-items: baseline;
   gap: 3px;
@@ -108,13 +108,13 @@
   color: var(--pp-text);
   letter-spacing: 0.01em;
 }
-.lb__coins-icon {
+.lb__points-icon {
   font-size: 9px;
   color: var(--pp-warning);
   align-self: center;
   margin-right: 2px;
 }
-.lb__coins-suffix {
+.lb__points-suffix {
   font-size: 11px;
   color: var(--pp-text-muted);
   font-weight: 700;

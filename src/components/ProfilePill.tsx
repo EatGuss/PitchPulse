@@ -1,15 +1,15 @@
 /**
  * ProfilePill — top-left of every screen. Avatar + name + team accent dot.
- * Coin balance is rendered separately by CoinBalance on the top-right.
+ * Match points are rendered separately by MatchPoints on the top-right.
  *
  * Gate 3: a 🔥N streak chip appears next to the name once the viewer's
  * consecutive-correct-predictions counter hits 2. The chip is driven by
- * useUserBalance so it updates in lock-step with leaderboard + toasts.
+ * useMatchPoints so it updates in lock-step with leaderboard + toasts.
  */
 
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import { teamAlias } from '../data/teamAliases';
-import { useUserBalance } from '../hooks/useUserBalance';
+import { useMatchPoints } from '../hooks/useMatchPoints';
 import './ProfilePill.css';
 
 export interface ProfilePillProps {
@@ -19,7 +19,7 @@ export interface ProfilePillProps {
 export function ProfilePill({ userId }: ProfilePillProps) {
   const user = DEMO_USERS[userId];
   const team = teamAlias(user.favoriteTeamId);
-  const { streak } = useUserBalance(userId);
+  const { streak } = useMatchPoints(userId);
 
   return (
     <div className="ppill">

@@ -11,7 +11,7 @@
  * deterministically return a winning option id or null. No side effects.
  *
  * Reward math (spec):  payout = baseReward × min(1 / vote_share, 5.0)
- * Wrong = 0 coins, never negative. Implemented in PromptEngine.resolve().
+ * Wrong = 0 points, never negative. Implemented in PromptEngine.resolve().
  */
 
 import type { PromptTemplate } from '../domain/promptTypes';

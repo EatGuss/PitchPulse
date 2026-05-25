@@ -1,11 +1,11 @@
 /**
- * Headless verification of the PitchCoin payout formula.
+ * Headless verification of the PitchPoints payout formula.
  *
  * Run with: npx tsx scripts/verify-payouts.ts
  *
  * Spec (PITCHPULSE.md §6.3, brief Pillar 3):
  *   payout = baseReward × min(1 / your_vote_share, 5)
- *   Wrong = 0 coins, never negative.
+ *   Wrong = 0 points, never negative.
  *
  * This is the pure-math sibling of PromptEngine.computePayouts(). If you
  * change the formula in the engine, mirror it here AND update these cases.

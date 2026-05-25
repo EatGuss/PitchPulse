@@ -41,7 +41,7 @@ export function ModePicker({ userId, onSelectMode, onSwitchUser }: ModePickerPro
         <p className="mode-picker__label">PICK A MODE</p>
         <ModeCard
           title="Public Match"
-          description="Jump into today's matchday. Predict prompts, earn PitchCoins, climb the live board."
+          description="Jump into today's matchday. Predict prompts, earn PitchPoints, climb the live board."
           icon="⚽"
           variant="accent"
           onSelect={() => onSelectMode('public')}

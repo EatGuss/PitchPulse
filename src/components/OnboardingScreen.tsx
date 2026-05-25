@@ -39,7 +39,7 @@ export function OnboardingScreen({ onContinue }: OnboardingScreenProps) {
         <h1 className="onb__title">Watch the match.<br />Predict the next moment.</h1>
         <p className="onb__sub">
           Live event ticker, 30-second prediction prompts,
-          and a coin economy that rewards you for spotting
+          and a PitchPoints economy that rewards you for spotting
           the moment first — not last.
         </p>
       </div>

@@ -49,7 +49,7 @@ export interface PromptEngineEventMap extends Record<string, unknown> {
   promptUpdated: { prompt: PromptInstance };
   promptClosed: { prompt: PromptInstance };
   promptResolved: { prompt: PromptInstance };
-  userBalanceChanged: { userId: string; balance: number; delta: number; reason: string };
+  userMatchPointsChanged: { userId: string; matchPoints: number; delta: number; reason: string };
   userStreakChanged: { userId: string; streak: number };
   promptSkipped: { templateId: string; reason: PromptSkipReason };
   reset: void;
@@ -79,7 +79,7 @@ export class PromptEngine {
     for (const u of Object.values(DEMO_USERS)) {
       this.users.set(u.id, {
         userId: u.id,
-        coinBalance: 0,
+        matchPoints: 0,
         streak: 0,
         totalCorrect: 0,
         totalVoted: 0,
@@ -109,12 +109,12 @@ export class PromptEngine {
     this.firedMinuteTriggers.clear();
     this.totalIssued = 0;
     for (const u of this.users.values()) {
-      u.coinBalance = 0;
+      u.matchPoints = 0;
       u.streak = 0;
       u.totalCorrect = 0;
       u.totalVoted = 0;
       u.history = [];
-      this.bus.emit('userBalanceChanged', { userId: u.userId, balance: 0, delta: 0, reason: 'reset' });
+      this.bus.emit('userMatchPointsChanged', { userId: u.userId, matchPoints: 0, delta: 0, reason: 'reset' });
       this.bus.emit('userStreakChanged', { userId: u.userId, streak: 0 });
     }
     this.bus.emit('reset', undefined);
@@ -299,7 +299,7 @@ export class PromptEngine {
       user.history.push({ promptId: a.id, pickedOptionId: pickedOption, won, payout });
 
       if (won) {
-        user.coinBalance += payout;
+        user.matchPoints += payout;
         user.totalCorrect += 1;
         user.streak += 1;
       } else {
@@ -307,9 +307,9 @@ export class PromptEngine {
       }
 
       if (payout > 0) {
-        this.bus.emit('userBalanceChanged', {
+        this.bus.emit('userMatchPointsChanged', {
           userId,
-          balance: user.coinBalance,
+          matchPoints: user.matchPoints,
           delta: payout,
           reason: 'prompt_win',
         });

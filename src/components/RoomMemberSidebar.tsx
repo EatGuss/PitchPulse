@@ -20,7 +20,7 @@ export function RoomMemberSidebar({ viewerId, members, roomName }: RoomMemberSid
   const memberIds = new Set(members.map((m) => m.userId));
   const rows = allRows
     .filter((r) => memberIds.has(r.userId))
-    .sort((a, b) => b.coinBalance - a.coinBalance);
+    .sort((a, b) => b.matchPoints - a.matchPoints);
 
   return (
     <aside
@@ -76,9 +76,9 @@ export function RoomMemberSidebar({ viewerId, members, roomName }: RoomMemberSid
                     </span>
                     <span className="rms__meta">
                       <span className="rms__name">{r.displayName}</span>
-                      <span className="rms__coins tabular">
-                        {r.coinBalance}
-                        <span className="rms__coins-suffix">pts</span>
+                      <span className="rms__points tabular">
+                        {r.matchPoints}
+                        <span className="rms__points-suffix">pts</span>
                       </span>
                     </span>
                   </li>

@@ -6,7 +6,7 @@
  *   - 'open'     : countdown ring, question, full-width stacked vote buttons,
  *                  live %, viewer's picked option highlighted
  *   - 'locked'   : window closed, "Waiting for resolution…", picks frozen
- *   - 'resolved' : winner badge, +N coin animation OR "No coins this round"
+ *   - 'resolved' : winner badge, +N points animation OR "No points this round"
  *
  * Collapse: while a prompt is open or locked, the viewer can collapse the sheet
  * to a thin pill at the bottom — with or without a vote — so the event feed stays
@@ -190,7 +190,7 @@ export function PromptSheet({
   const winnerId = prompt.winningOptionId;
   const myWon = showResult && myPickedOptionId !== null && myPickedOptionId === winnerId;
   const myPayout = prompt.payouts?.[viewerId] ?? 0;
-  // (The actual coin balance animation lives in CoinBalance — driven by useUserBalance.
+  // Match points animation lives in MatchPoints — driven by useMatchPoints.
   // This sheet only narrates the result.)
 
   const pickedOption = prompt.options.find((o) => o.id === myPickedOptionId) ?? null;
@@ -306,7 +306,7 @@ export function PromptSheet({
                 <span className="tabular"> min(1 / your_vote_share, 5.0)</span>.
               </li>
               <li>
-                <strong>Wrong = 0 coins.</strong> Never negative. Never real money.
+                <strong>Wrong = 0 points.</strong> Never negative. Never real money.
               </li>
             </ul>
           </div>

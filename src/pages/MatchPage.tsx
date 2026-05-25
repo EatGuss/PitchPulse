@@ -6,7 +6,7 @@
  */
 
 import { ProfilePill } from '../components/ProfilePill';
-import { CoinBalance } from '../components/CoinBalance';
+import { MatchPoints } from '../components/MatchPoints';
 import { MatchHeader } from '../components/MatchHeader';
 import { EventFeed } from '../components/EventFeed';
 import { SimControls } from '../components/SimControls';
@@ -20,7 +20,7 @@ import { BadgeToast } from '../components/BadgeToast';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
-import { useUserBalance } from '../hooks/useUserBalance';
+import { useMatchPoints } from '../hooks/useMatchPoints';
 import type { DemoUserId } from '../data/personas';
 import type { RankedOpponent } from '../domain/rankedTypes';
 import type { WatchRoomSession } from '../domain/watchRoomTypes';
@@ -50,7 +50,7 @@ export function MatchPage({
   const { info, ready, error } = useMatchData();
   const { clock, events, paused } = useMatchSimState();
   const { prompt, vote, myPickedOptionId } = useActivePrompt(userId);
-  const { balance } = useUserBalance(userId);
+  const { matchPoints } = useMatchPoints(userId);
   const inWatchRoom = !!watchRoom;
   const inRanked = !!rankedOpponent;
   const memberIds = watchRoom?.members.map((m) => m.userId);
@@ -123,7 +123,7 @@ export function MatchPage({
               )}
               <ProfilePill userId={userId} />
             </div>
-            <CoinBalance value={balance} />
+            <MatchPoints value={matchPoints} />
           </div>
           {inRanked && rankedOpponent && (
             <div className="mpage__ranked-bar" aria-label="Ranked opponent">

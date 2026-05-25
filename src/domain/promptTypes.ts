@@ -7,7 +7,7 @@
  *   - 30-second answer window — closesAtMinute = openedAtMinute + 0.5
  *   - Vote validity checked at submit time against server-authoritative clock
  *   - Resolution NEVER happens during the open window (ADR-001 + brief DO-NOT)
- *   - Wrong predictions = 0 coins, never negative
+ *   - Wrong predictions = 0 points, never negative
  *   - Per-match cap of 8 prompts total
  */
 
@@ -53,7 +53,7 @@ export interface PromptTemplate {
   trigger: PromptTrigger;
   /** Options the user picks between (always rendered as full-width stacked buttons). */
   options: PromptOption[];
-  /** Coin reward seed; effective reward = base × min(1/share, 5). */
+  /** Point reward seed; effective reward = base × min(1/share, 5). */
   baseReward: number;
   /**
    * Inspect the post-open event log + clock to decide if/when this prompt
@@ -96,13 +96,13 @@ export interface PromptInstance {
   winningOptionId?: string;
   resolvedAtMinute?: number;
   /** Per-user payout after resolution. */
-  payouts?: Record<string, number>;  // userId -> coins
+  payouts?: Record<string, number>;  // userId -> match points
 }
 
 /** Per-user gamification state held by the engine. */
 export interface UserState {
   userId: string;
-  coinBalance: number;
+  matchPoints: number;
   streak: number;        // consecutive correct predictions (Gate 3 surfaces visually)
   totalCorrect: number;  // for badges (Gate 3)
   totalVoted: number;

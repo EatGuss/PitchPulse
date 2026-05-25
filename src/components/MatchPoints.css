@@ -1,4 +1,4 @@
-.cbal {
+.mpoints {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -10,31 +10,31 @@
   color: var(--pp-text);
   font-weight: 700;
 }
-.cbal__icon {
+.mpoints__icon {
   color: var(--pp-warning);
   font-size: 12px;
   line-height: 1;
   text-shadow: 0 0 8px rgba(242, 201, 76, 0.4);
 }
-.cbal__num {
+.mpoints__num {
   font-size: 13px;
   letter-spacing: 0.01em;
 }
-.cbal__suffix {
+.mpoints__suffix {
   font-size: 11px;
   color: var(--pp-text-muted);
   font-weight: 700;
 }
-.cbal__delta {
+.mpoints__delta {
   position: absolute;
   top: -16px;
   right: 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pp-success);
-  animation: cbal-delta-pop 1400ms var(--pp-ease) forwards;
+  animation: mpoints-delta-pop 1400ms var(--pp-ease) forwards;
 }
-@keyframes cbal-delta-pop {
+@keyframes mpoints-delta-pop {
   0%   { transform: translateY(8px); opacity: 0; }
   20%  { transform: translateY(0);   opacity: 1; }
   80%  { transform: translateY(-4px); opacity: 1; }
