@@ -7,7 +7,7 @@
  *   - Closes the 30s answer window
  *   - Validates and records votes (server-side per ADR-001)
  *   - Resolves prompts on the right trigger AFTER the window has closed
- *   - Computes payouts using base × min(1/share, 5), wrong = 0, never negative
+   *   - Computes payouts: ranked = fixed baseReward; watch room = base × min(1/share, 5)
  *   - Tracks per-user balance, streak, and history
  *
  * Gate 2 runs this in-browser as a singleton. Gate 4 replaces it with a Lambda
@@ -17,6 +17,7 @@
 
 import { TypedEventBus } from './eventBus';
 import { getMatchSim } from './matchSim';
+import { consumeHotTake, HOT_TAKE_MULTIPLIER, resetHotTakeState } from './hotTakeStore';
 import { PROMPT_TEMPLATES } from '../data/promptTemplates';
 import { DEMO_USERS } from '../data/personas';
 import type {
@@ -52,6 +53,7 @@ export interface PromptEngineEventMap extends Record<string, unknown> {
   userMatchPointsChanged: { userId: string; matchPoints: number; delta: number; reason: string };
   userStreakChanged: { userId: string; streak: number };
   promptSkipped: { templateId: string; reason: PromptSkipReason };
+  hotTakeWon: { userId: string; promptId: string; payout: number };
   reset: void;
 }
 
@@ -88,6 +90,17 @@ export class PromptEngine {
     }
   }
 
+  private rankedScoring = false;
+
+  /** Ranked 1v1 uses fixed baseReward per correct pick — no odds multiplier. */
+  setRankedScoring(enabled: boolean): void {
+    this.rankedScoring = enabled;
+  }
+
+  isRankedScoring(): boolean {
+    return this.rankedScoring;
+  }
+
   /** Bind to a MatchSim instance + arm with the match info for placeholder substitutions. */
   attach(info: MatchInfo): void {
     this.homeTeamId = info.teams.home.id;
@@ -117,6 +130,7 @@ export class PromptEngine {
       this.bus.emit('userMatchPointsChanged', { userId: u.userId, matchPoints: 0, delta: 0, reason: 'reset' });
       this.bus.emit('userStreakChanged', { userId: u.userId, streak: 0 });
     }
+    resetHotTakeState();
     this.bus.emit('reset', undefined);
   }
 
@@ -144,7 +158,12 @@ export class PromptEngine {
    * Wall-clock validation is authoritative — mirrors what a Lambda resolver
    * does in Gate 4 (it never trusts the client-claimed timestamp).
    */
-  submitVote(promptId: string, userId: string, optionId: string): boolean {
+  submitVote(
+    promptId: string,
+    userId: string,
+    optionId: string,
+    opts?: { hotTake?: boolean; matchId?: string },
+  ): boolean {
     const a = this.active;
     if (!a) return false;
     if (a.id !== promptId) return false;
@@ -154,8 +173,19 @@ export class PromptEngine {
     if (!a.options.some((o) => o.id === optionId)) return false;
     if (!this.users.has(userId)) return false;
 
+    const hotTake = Boolean(opts?.hotTake);
+    if (hotTake) {
+      if (!this.rankedScoring) return false;
+      const matchId = opts?.matchId;
+      if (!matchId || !consumeHotTake(matchId, userId)) return false;
+    }
+
     const previous = a.userVotes[userId];
     a.userVotes[userId] = optionId;
+    if (!a.userHotTakes) a.userHotTakes = {};
+    if (hotTake) a.userHotTakes[userId] = true;
+    else if (!(userId in a.userHotTakes)) a.userHotTakes[userId] = false;
+
     a.voteCounts = { ...a.voteCounts };
     if (previous) a.voteCounts[previous] = Math.max(0, (a.voteCounts[previous] ?? 0) - 1);
     a.voteCounts[optionId] = (a.voteCounts[optionId] ?? 0) + 1;
@@ -258,6 +288,7 @@ export class PromptEngine {
       closesAtWallMs: wallNow + PROMPT_WINDOW_MS,
       voteCounts: Object.fromEntries(template.options.map((o) => [o.id, 0])),
       userVotes: {},
+      userHotTakes: {},
       template,
       eventsSinceOpen: [],
     };
@@ -313,6 +344,9 @@ export class PromptEngine {
           delta: payout,
           reason: 'prompt_win',
         });
+        if (a.userHotTakes?.[userId] && won) {
+          this.bus.emit('hotTakeWon', { userId, promptId: a.id, payout });
+        }
       }
       this.bus.emit('userStreakChanged', { userId, streak: user.streak });
     }
@@ -327,19 +361,36 @@ export class PromptEngine {
   }
 
   private computePayouts(a: ActivePrompt, winningOptionId: string): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [userId, pickedOption] of Object.entries(a.userVotes)) {
+      out[userId] = pickedOption === winningOptionId ? a.baseReward : 0;
+    }
+
+    if (this.rankedScoring) {
+      for (const [userId, pickedOption] of Object.entries(a.userVotes)) {
+        if (pickedOption !== winningOptionId) {
+          out[userId] = 0;
+          continue;
+        }
+        const base = a.baseReward;
+        out[userId] = a.userHotTakes?.[userId]
+          ? Math.round(base * HOT_TAKE_MULTIPLIER)
+          : base;
+      }
+      return out;
+    }
+
     const totalVotes = Object.values(a.voteCounts).reduce((s, n) => s + n, 0);
     const winners = a.voteCounts[winningOptionId] ?? 0;
     if (totalVotes === 0 || winners === 0) {
-      // No one (or nobody correct) — nobody earns, nobody loses.
       return {};
     }
     const share = winners / totalVotes;
     const multiplier = Math.min(1 / share, MAX_REWARD_MULTIPLIER);
     const reward = Math.round(a.baseReward * multiplier);
 
-    const out: Record<string, number> = {};
-    for (const [userId, pickedOption] of Object.entries(a.userVotes)) {
-      out[userId] = pickedOption === winningOptionId ? reward : 0;
+    for (const userId of Object.keys(out)) {
+      out[userId] = out[userId]! > 0 ? reward : 0;
     }
     return out;
   }
@@ -361,6 +412,7 @@ export class PromptEngine {
       closesAtWallMs: a.closesAtWallMs,
       voteCounts: { ...a.voteCounts },
       userVotes: { ...a.userVotes },
+      userHotTakes: a.userHotTakes ? { ...a.userHotTakes } : undefined,
       winningOptionId: a.winningOptionId,
       resolvedAtMinute: a.resolvedAtMinute,
       payouts: a.payouts ? { ...a.payouts } : undefined,

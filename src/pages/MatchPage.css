@@ -87,6 +87,34 @@
   flex: 1;
 }
 
+.mpage__wr-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mpage__wr-btn {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-surface);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+}
+
+.mpage__wr-btn--min {
+  min-width: 34px;
+  padding: 0;
+  font-size: 14px;
+}
+
+.mpage__wr-btn--leave {
+  color: var(--pp-warning);
+}
+
 .mpage__switch-user {
   flex-shrink: 0;
   display: inline-flex;

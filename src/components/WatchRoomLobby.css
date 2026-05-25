@@ -48,6 +48,40 @@
   margin-bottom: 20px;
 }
 
+.wr-lobby__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.wr-lobby__minimize,
+.wr-lobby__leave {
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.wr-lobby__minimize {
+  color: var(--pp-text-muted);
+}
+
+.wr-lobby__minimize:hover {
+  color: var(--pp-text);
+}
+
+.wr-lobby__leave {
+  color: var(--pp-warning);
+}
+
+.wr-lobby__leave:hover {
+  color: #ffb4b4;
+}
+
 .wr-lobby__back {
   align-self: flex-start;
   padding: 6px 0;
@@ -78,6 +112,13 @@
   letter-spacing: -0.02em;
   color: var(--pp-text);
   line-height: 1.1;
+}
+
+.wr-lobby__match {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
 }
 
 .wr-lobby__status {

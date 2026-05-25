@@ -1,0 +1,26 @@
+.home-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tab-shell--home-stack {
+  position: relative;
+  isolation: isolate;
+}
+.tab-shell--modal-open {
+  overflow: hidden;
+}
+.tab-shell--modal-open .home-tab__sections {
+  overflow: hidden;
+}
+.tab-shell--live-feed-open .home-tab {
+  pointer-events: none;
+}
+.tab-shell--live-feed-open .home-tab__sections {
+  visibility: hidden;
+}
+.home-tab__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

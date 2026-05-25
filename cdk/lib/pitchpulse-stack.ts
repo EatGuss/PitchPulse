@@ -2,10 +2,8 @@
  * PitchPulseStack — single stack containing the entire AWS surface:
  *
  *   DynamoDB
- *     pp-users    — coin balances, streaks, badge unlocks, ranked tier/title state (no Streams)
- *                   PROFILE: tier, tierWinsTowardNext, totalShots, correctShots,
- *                   rankedMatchesPlayed, lifetimeAccuracy, equippedTitleId, unlockedTitles
- *                   TITLE_PROGRESS#<titleId>: per-title progress for locked titles
+ *     pp-users    — PROFILE: tier, titles, weeklyPoints, seasonalPoints, season metadata
+ *     pp-leaderboards — weekly + seasonal leaderboard rows (PointsRankIndex GSI)
  *     pp-matches  — CLOCK + EVENT items; Streams → stream-handler Lambda
  *     pp-prompts  — prompt META + VOTE items, TTL on expiresAt
  *     pp-rooms    — Watch Room META/MEMBER/COMMENT/REACTION items + InviteCode GSI
@@ -64,6 +62,7 @@ const HACKATHON_DATA_BUCKET = 'hackathon-data-058755927272';
 const MATCH_EVENTS_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/Events_Anonym.xml';
 const MATCH_INFO_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/MatchInformations_Anonym.xml';
 const MATCH_ID = 'DFL-MAT-000001';
+const SEASON_WEEKS = '8';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CDK_ROOT = path.resolve(__dirname, '..');
@@ -110,6 +109,17 @@ export class PitchPulseStack extends Stack {
     roomsTable.addGlobalSecondaryIndex({
       indexName: 'InviteCodeIndex',
       partitionKey: { name: 'inviteCode', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const leaderboardsTable = new dynamodb.Table(this, 'LeaderboardsTable', {
+      ...ddbCommon,
+      tableName: 'pp-leaderboards',
+    });
+    leaderboardsTable.addGlobalSecondaryIndex({
+      indexName: 'PointsRankIndex',
+      partitionKey: { name: 'periodKey', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'points', type: dynamodb.AttributeType.NUMBER },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
@@ -225,9 +235,68 @@ export class PitchPulseStack extends Stack {
       memorySize: 256,
       environment: {
         USERS_TABLE: usersTable.tableName,
+        LEADERBOARDS_TABLE: leaderboardsTable.tableName,
+        SEASON_WEEKS,
+        // APPSYNC_URL added below once the API exists.
       },
     });
     usersTable.grantReadWriteData(rankedHandlerFn);
+    leaderboardsTable.grantReadWriteData(rankedHandlerFn);
+
+    const leaderboardHandlerFn = new lambdaNodejs.NodejsFunction(this, 'LeaderboardHandlerFn', {
+      ...fnDefaults,
+      functionName: 'pp-leaderboard-handler',
+      entry: path.join(CDK_ROOT, 'lambda', 'leaderboard-handler', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(15),
+      memorySize: 256,
+      environment: {
+        USERS_TABLE: usersTable.tableName,
+        LEADERBOARDS_TABLE: leaderboardsTable.tableName,
+        SEASON_WEEKS,
+      },
+    });
+    usersTable.grantReadData(leaderboardHandlerFn);
+    leaderboardsTable.grantReadData(leaderboardHandlerFn);
+
+    const voteHandlerFn = new lambdaNodejs.NodejsFunction(this, 'VoteHandlerFn', {
+      ...fnDefaults,
+      functionName: 'pp-vote-handler',
+      entry: path.join(CDK_ROOT, 'lambda', 'vote-handler', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(10),
+      memorySize: 256,
+      environment: {
+        PROMPTS_TABLE: promptsTable.tableName,
+      },
+    });
+    promptsTable.grantReadWriteData(voteHandlerFn);
+
+    const weeklyResetFn = new lambdaNodejs.NodejsFunction(this, 'WeeklyResetFn', {
+      ...fnDefaults,
+      functionName: 'pp-weekly-reset',
+      entry: path.join(CDK_ROOT, 'lambda', 'weekly-reset', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(60),
+      memorySize: 256,
+      environment: {
+        USERS_TABLE: usersTable.tableName,
+      },
+    });
+    usersTable.grantReadWriteData(weeklyResetFn);
+
+    const seasonResetFn = new lambdaNodejs.NodejsFunction(this, 'SeasonResetFn', {
+      ...fnDefaults,
+      functionName: 'pp-season-reset',
+      entry: path.join(CDK_ROOT, 'lambda', 'season-reset', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(60),
+      memorySize: 256,
+      environment: {
+        USERS_TABLE: usersTable.tableName,
+      },
+    });
+    usersTable.grantReadWriteData(seasonResetFn);
 
     // ─── AppSync GraphQL API ───────────────────────────────────────────
 
@@ -255,8 +324,9 @@ export class PitchPulseStack extends Stack {
       xrayEnabled: false,
     });
 
-    // Now that the API exists, plumb its URL into the stream-handler.
+    // Now that the API exists, plumb its URL into server-side broadcast Lambdas.
     streamHandlerFn.addEnvironment('APPSYNC_URL', api.graphqlUrl);
+    rankedHandlerFn.addEnvironment('APPSYNC_URL', api.graphqlUrl);
     // stream-handler is IAM-allowed to invoke just the two publish mutations.
     streamHandlerFn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -264,6 +334,16 @@ export class PitchPulseStack extends Stack {
         resources: [
           `${api.arn}/types/Mutation/fields/publishMatchClock`,
           `${api.arn}/types/Mutation/fields/publishMatchEvent`,
+        ],
+      }),
+    );
+
+    rankedHandlerFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['appsync:GraphQL'],
+        resources: [
+          `${api.arn}/types/Mutation/fields/publishLeaderboardUpdated`,
+          `${api.arn}/types/Mutation/fields/notifyTitleUnlocked`,
         ],
       }),
     );
@@ -276,6 +356,8 @@ export class PitchPulseStack extends Stack {
     const startMatchDS = api.addLambdaDataSource('StartMatchDS', startMatchFn);
     const roomHandlerDS = api.addLambdaDataSource('RoomHandlerDS', roomHandlerFn);
     const rankedHandlerDS = api.addLambdaDataSource('RankedHandlerDS', rankedHandlerFn);
+    const leaderboardHandlerDS = api.addLambdaDataSource('LeaderboardHandlerDS', leaderboardHandlerFn);
+    const voteHandlerDS = api.addLambdaDataSource('VoteHandlerDS', voteHandlerFn);
 
     // ─── AppSync resolvers ─────────────────────────────────────────────
 
@@ -303,11 +385,17 @@ export class PitchPulseStack extends Stack {
       code: appsync.Code.fromAsset(path.join(resolverRoot, 'fireReaction.js')),
     });
 
-    promptsDS.createResolver('SubmitVoteResolver', {
+    voteHandlerDS.createResolver('SubmitVoteResolver', {
       typeName: 'Mutation',
       fieldName: 'submitVote',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'submitVote.js')),
+    });
+    voteHandlerDS.createResolver('SignalHotTakeResolver', {
+      typeName: 'Mutation',
+      fieldName: 'signalHotTake',
+    });
+    voteHandlerDS.createResolver('InitRankedHotTakeResolver', {
+      typeName: 'Mutation',
+      fieldName: 'initRankedHotTake',
     });
 
     // Lambda data sources don't use JS resolvers — they wire mutation args
@@ -315,6 +403,10 @@ export class PitchPulseStack extends Stack {
     startMatchDS.createResolver('StartMatchResolver', {
       typeName: 'Mutation',
       fieldName: 'startMatch',
+    });
+    startMatchDS.createResolver('ResetMatchResolver', {
+      typeName: 'Mutation',
+      fieldName: 'resetMatch',
     });
 
     roomHandlerDS.createResolver('CreateRoomResolver', {
@@ -345,9 +437,21 @@ export class PitchPulseStack extends Stack {
       typeName: 'Mutation',
       fieldName: 'findRankedMatch',
     });
+    rankedHandlerDS.createResolver('LockInRankedMatchResolver', {
+      typeName: 'Mutation',
+      fieldName: 'lockInRankedMatch',
+    });
+    rankedHandlerDS.createResolver('RankedMatchdayStatusResolver', {
+      typeName: 'Query',
+      fieldName: 'rankedMatchdayStatus',
+    });
     rankedHandlerDS.createResolver('EquipTitleResolver', {
       typeName: 'Mutation',
       fieldName: 'equipTitle',
+    });
+    rankedHandlerDS.createResolver('UnlockHotTakeHeroResolver', {
+      typeName: 'Mutation',
+      fieldName: 'unlockHotTakeHero',
     });
     rankedHandlerDS.createResolver('CompleteRankedMatchResolver', {
       typeName: 'Mutation',
@@ -368,6 +472,26 @@ export class PitchPulseStack extends Stack {
       code: appsync.Code.fromAsset(path.join(resolverRoot, 'notifyTitleUnlocked.js')),
     });
 
+    noneDS.createResolver('PublishLeaderboardUpdatedResolver', {
+      typeName: 'Mutation',
+      fieldName: 'publishLeaderboardUpdated',
+      runtime: jsRuntime,
+      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishLeaderboardUpdated.js')),
+    });
+
+    leaderboardHandlerDS.createResolver('WeeklyLeaderboardResolver', {
+      typeName: 'Query',
+      fieldName: 'weeklyLeaderboard',
+    });
+    leaderboardHandlerDS.createResolver('SeasonalLeaderboardResolver', {
+      typeName: 'Query',
+      fieldName: 'seasonalLeaderboard',
+    });
+    leaderboardHandlerDS.createResolver('UserStatsResolver', {
+      typeName: 'Query',
+      fieldName: 'userStats',
+    });
+
     // ─── EventBridge cron (safety-net for sim-emitter loop) ────────────
 
     new events.Rule(this, 'SimEmitterCron', {
@@ -375,6 +499,20 @@ export class PitchPulseStack extends Stack {
       description: 'Keeps sim-emitter alive; the in-Lambda loop handles the actual 2-second cadence.',
       schedule: events.Schedule.rate(Duration.minutes(1)),
       targets: [new eventsTargets.LambdaFunction(simEmitterFn)],
+    });
+
+    new events.Rule(this, 'WeeklyResetCron', {
+      ruleName: 'pp-weekly-reset',
+      description: 'Resets weeklyPoints every Monday 00:00 CET (Sunday 23:00 UTC).',
+      schedule: events.Schedule.cron({ minute: '0', hour: '23', weekDay: 'SUN' }),
+      targets: [new eventsTargets.LambdaFunction(weeklyResetFn)],
+    });
+
+    new events.Rule(this, 'SeasonResetCron', {
+      ruleName: 'pp-season-reset',
+      description: 'Season reset — far-future cron for demo; invoke manually to test.',
+      schedule: events.Schedule.cron({ minute: '0', hour: '0', day: '1', month: '1', year: '2099' }),
+      targets: [new eventsTargets.LambdaFunction(seasonResetFn)],
     });
 
     // ─── Cognito Identity Pool (anonymous access) ──────────────────────
@@ -409,14 +547,24 @@ export class PitchPulseStack extends Stack {
         resources: [
           // Client-callable mutations
           `${api.arn}/types/Mutation/fields/startMatch`,
+          `${api.arn}/types/Mutation/fields/resetMatch`,
           `${api.arn}/types/Mutation/fields/fireReaction`,
           `${api.arn}/types/Mutation/fields/submitVote`,
+          `${api.arn}/types/Mutation/fields/signalHotTake`,
+          `${api.arn}/types/Mutation/fields/initRankedHotTake`,
           `${api.arn}/types/Mutation/fields/createRoom`,
           `${api.arn}/types/Mutation/fields/joinRoom`,
           `${api.arn}/types/Mutation/fields/postComment`,
           `${api.arn}/types/Mutation/fields/leaveRoom`,
           `${api.arn}/types/Mutation/fields/findRankedMatch`,
+          `${api.arn}/types/Mutation/fields/lockInRankedMatch`,
           `${api.arn}/types/Mutation/fields/equipTitle`,
+          `${api.arn}/types/Mutation/fields/unlockHotTakeHero`,
+          // Client-receivable queries (Gate B)
+          `${api.arn}/types/Query/fields/weeklyLeaderboard`,
+          `${api.arn}/types/Query/fields/seasonalLeaderboard`,
+          `${api.arn}/types/Query/fields/userStats`,
+          `${api.arn}/types/Query/fields/rankedMatchdayStatus`,
           // Client-receivable subscriptions
           `${api.arn}/types/Subscription/fields/matchClock`,
           `${api.arn}/types/Subscription/fields/matchEvent`,
@@ -427,6 +575,8 @@ export class PitchPulseStack extends Stack {
           `${api.arn}/types/Subscription/fields/roomLeaderboardUpdate`,
           `${api.arn}/types/Subscription/fields/tierPromoted`,
           `${api.arn}/types/Subscription/fields/titleUnlocked`,
+          `${api.arn}/types/Subscription/fields/rivalHotTakeSignal`,
+          `${api.arn}/types/Subscription/fields/leaderboardUpdated`,
           // Schema sanity check
           `${api.arn}/types/Query/fields/ping`,
         ],
@@ -456,6 +606,7 @@ export class PitchPulseStack extends Stack {
     new CfnOutput(this, 'IdentityPoolId', { value: identityPool.ref });
     new CfnOutput(this, 'Region', { value: this.region });
     new CfnOutput(this, 'MatchId', { value: MATCH_ID });
+    new CfnOutput(this, 'SeasonWeeks', { value: SEASON_WEEKS });
 
     void promptsTable;
   }

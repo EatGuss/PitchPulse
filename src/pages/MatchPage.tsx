@@ -5,12 +5,12 @@
  *   Watch Room → after host starts match from lobby
  */
 
+import { useEffect } from 'react';
 import { ProfilePill } from '../components/ProfilePill';
 import { MatchPoints } from '../components/MatchPoints';
 import { MatchHeader } from '../components/MatchHeader';
 import { EventFeed } from '../components/EventFeed';
 import { SimControls } from '../components/SimControls';
-import { BottomTabBar } from '../components/BottomTabBar';
 import { PromptSheet } from '../components/PromptSheet';
 import { Leaderboard } from '../components/Leaderboard';
 import { RoomMemberSidebar } from '../components/RoomMemberSidebar';
@@ -20,40 +20,60 @@ import { BadgeToast } from '../components/BadgeToast';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
+import { useHotTake } from '../hooks/useHotTake';
 import { useMatchPoints } from '../hooks/useMatchPoints';
 import type { DemoUserId } from '../data/personas';
 import type { RankedOpponent } from '../domain/rankedTypes';
 import type { WatchRoomSession } from '../domain/watchRoomTypes';
+import { getPromptEngine } from '../sim/promptEngine';
 import './MatchPage.css';
 
 export interface MatchPageProps {
   userId: DemoUserId;
   hideSimControls?: boolean;
-  onSwitchUser?: () => void;
   /** When set, enables Watch Room match UX (sidebar, live picks, room reactions). */
   watchRoom?: WatchRoomSession;
-  onLeaveWatchRoom?: () => void;
-  /** When set, ranked mode — hidden picks, no reactions or comments. */
+  onMinimizeWatchRoom?: () => void;
+  onLeaveWatchRoom?: () => void | Promise<void>;
+  /** When set, ranked mode — hidden picks, no reactions or comments. No leave during live match. */
   rankedOpponent?: RankedOpponent;
-  onLeaveRanked?: () => void;
 }
 
 export function MatchPage({
   userId,
   hideSimControls = false,
-  onSwitchUser,
   watchRoom,
+  onMinimizeWatchRoom,
   onLeaveWatchRoom,
   rankedOpponent,
-  onLeaveRanked,
 }: MatchPageProps) {
   const { info, ready, error } = useMatchData();
   const { clock, events, paused } = useMatchSimState();
-  const { prompt, vote, myPickedOptionId } = useActivePrompt(userId);
+  const { prompt, vote: engineVote, myPickedOptionId } = useActivePrompt(userId);
+  const inRanked = !!rankedOpponent;
+  const {
+    remaining: hotTakeRemaining,
+    hotTakeOn,
+    setHotTakeOn,
+    rivalHotTakePromptId,
+    vote: rankedVote,
+  } = useHotTake({
+    enabled: inRanked,
+    userId,
+    rivalUserId: rankedOpponent?.opponentId,
+  });
+  const handleVote = (optionId: string): boolean => {
+    if (inRanked && prompt) return rankedVote(prompt.id, optionId);
+    return engineVote(optionId);
+  };
   const { matchPoints } = useMatchPoints(userId);
   const inWatchRoom = !!watchRoom;
-  const inRanked = !!rankedOpponent;
   const memberIds = watchRoom?.members.map((m) => m.userId);
+
+  useEffect(() => {
+    getPromptEngine().setRankedScoring(inRanked);
+    return () => getPromptEngine().setRankedScoring(false);
+  }, [inRanked]);
 
   if (error) {
     return (
@@ -88,38 +108,29 @@ export function MatchPage({
         <div className="mpage__main">
           <div className="mpage__topbar">
             <div className="mpage__topbar-start">
-              {onSwitchUser && (
-                <button
-                  type="button"
-                  className="mpage__switch-user"
-                  onClick={onSwitchUser}
-                  aria-label="Switch demo fan — choose Alice or Bob"
-                >
-                  <span className="mpage__switch-user-icon" aria-hidden="true">←</span>
-                  <span className="mpage__switch-user-label">Switch fan</span>
-                </button>
-              )}
-              {inWatchRoom && onLeaveWatchRoom && (
-                <button
-                  type="button"
-                  className="mpage__switch-user"
-                  onClick={onLeaveWatchRoom}
-                  aria-label="Leave watch room"
-                >
-                  <span className="mpage__switch-user-icon" aria-hidden="true">←</span>
-                  <span className="mpage__switch-user-label">Room</span>
-                </button>
-              )}
-              {inRanked && onLeaveRanked && (
-                <button
-                  type="button"
-                  className="mpage__switch-user"
-                  onClick={onLeaveRanked}
-                  aria-label="Leave ranked match"
-                >
-                  <span className="mpage__switch-user-icon" aria-hidden="true">←</span>
-                  <span className="mpage__switch-user-label">Ranked</span>
-                </button>
+              {inWatchRoom && (onMinimizeWatchRoom || onLeaveWatchRoom) && (
+                <div className="mpage__wr-nav">
+                  {onMinimizeWatchRoom && (
+                    <button
+                      type="button"
+                      className="mpage__wr-btn mpage__wr-btn--min"
+                      onClick={onMinimizeWatchRoom}
+                      aria-label="Minimize watch room"
+                    >
+                      ↓
+                    </button>
+                  )}
+                  {onLeaveWatchRoom && (
+                    <button
+                      type="button"
+                      className="mpage__wr-btn mpage__wr-btn--leave"
+                      onClick={() => void onLeaveWatchRoom()}
+                      aria-label="Leave watch room"
+                    >
+                      Leave
+                    </button>
+                  )}
+                </div>
               )}
               <ProfilePill userId={userId} />
             </div>
@@ -147,7 +158,6 @@ export function MatchPage({
             )}
             <div className="mpage__dock">
               {!hideSimControls && <SimControls variant="inline" />}
-              <BottomTabBar active="match" />
             </div>
           </div>
         </div>
@@ -164,11 +174,16 @@ export function MatchPage({
         prompt={prompt}
         myPickedOptionId={myPickedOptionId}
         viewerId={userId}
-        onVote={vote}
+        onVote={handleVote}
         pickRevealMode={inWatchRoom ? 'live' : 'both-voted'}
         roomMembers={watchRoom?.members}
         roomId={inWatchRoom ? watchRoom?.roomId : undefined}
         matchPaused={paused}
+        fixedScoring={inRanked}
+        hotTakeRemaining={inRanked ? hotTakeRemaining : undefined}
+        hotTakeOn={hotTakeOn}
+        onHotTakeChange={inRanked ? setHotTakeOn : undefined}
+        rivalHotTakeActive={inRanked && !!prompt && rivalHotTakePromptId === prompt.id}
       />
       <BadgeToast viewerId={userId} />
     </div>

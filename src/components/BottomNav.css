@@ -1,4 +1,4 @@
-.btb {
+.bnav {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -8,7 +8,7 @@
   border-top: 1px solid var(--pp-border);
   padding: 6px 8px calc(var(--pp-phone-safebottom) - 12px);
 }
-.btb__tab {
+.bnav__tab {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -19,14 +19,14 @@
   border-radius: 8px;
   transition: color var(--pp-d-fast) var(--pp-ease);
 }
-.btb__tab.is-active {
+.bnav__tab.is-active {
   color: var(--pp-accent);
 }
-.btb__icon {
+.bnav__icon {
   font-size: 20px;
   line-height: 1;
 }
-.btb__label {
+.bnav__label {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;

@@ -71,6 +71,19 @@
   background: transparent;
   color: var(--pp-text-muted);
 }
+.simctl__btn--dev {
+  border-style: dashed;
+  color: var(--pp-warning);
+}
+
+.simctl__reset-note {
+  margin: 0;
+  max-width: 280px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--pp-warning);
+  text-align: center;
+}
 
 .simctl__hint {
   font-size: 11px;

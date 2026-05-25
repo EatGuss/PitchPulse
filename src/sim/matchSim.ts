@@ -15,6 +15,7 @@
  */
 
 import { TypedEventBus } from './eventBus';
+import { bindMatchdaySchedule } from './matchdaySchedule';
 import type { EventsFile, MatchClockState, NormalizedEvent } from '../domain/types';
 
 export interface SimEventMap extends Record<string, unknown> {
@@ -300,7 +301,12 @@ export class MatchSim {
 // inside the same JS event-loop tick (the "<200ms parity" Gate 1 check).
 
 let _singleton: MatchSim | null = null;
+let _scheduleBound = false;
 export function getMatchSim(): MatchSim {
   if (!_singleton) _singleton = new MatchSim();
+  if (!_scheduleBound) {
+    bindMatchdaySchedule(_singleton);
+    _scheduleBound = true;
+  }
   return _singleton;
 }

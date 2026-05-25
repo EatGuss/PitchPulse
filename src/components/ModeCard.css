@@ -33,6 +33,19 @@
     linear-gradient(180deg, var(--pp-surface-2) 0%, var(--pp-surface) 100%);
 }
 
+.mode-card--disabled,
+.mode-card--disabled:hover {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--pp-border);
+  background: var(--pp-surface);
+}
+
+.mode-card--disabled .mode-card__cta {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
 .mode-card__icon {
   flex-shrink: 0;
   display: grid;

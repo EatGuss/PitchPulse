@@ -24,7 +24,7 @@ interface LocalRoom {
 
 const roomsByCode = new Map<string, LocalRoom>();
 const commentsByKey = new Map<string, RoomComment[]>();
-const bus = new TypedEventBus<{ memberJoined: JoinRoomPayload; comment: RoomComment }>();
+const bus = new TypedEventBus<{ memberJoined: JoinRoomPayload; comment: RoomComment; roomChanged: undefined }>();
 
 function commentKey(roomId: string, promptId: string): string {
   return `${roomId}#${promptId}`;
@@ -80,6 +80,7 @@ export function localCreateRoom(
   displayName: string,
   matchId: string = MATCH_ID,
 ): WatchRoomSession {
+  localLeaveRoom(userId);
   const roomId = randomId();
   const inviteCode = generateInviteCode();
   const now = Date.now();
@@ -94,6 +95,7 @@ export function localCreateRoom(
     members: new Map([[userId, member]]),
   };
   roomsByCode.set(inviteCode, room);
+  notifyRoomsChanged();
   return toSession(room);
 }
 
@@ -106,6 +108,8 @@ export function localJoinRoom(
   if (!inviteCode) {
     throw new Error('Invite code must be in XXX-XXX format');
   }
+
+  localLeaveRoom(userId);
 
   const room = roomsByCode.get(inviteCode);
   if (!room) {
@@ -160,6 +164,33 @@ export function localPostComment(
   return comment;
 }
 
+function notifyRoomsChanged(): void {
+  bus.emit('roomChanged', undefined);
+}
+
+function findRoomForUser(userId: string): LocalRoom | undefined {
+  for (const room of roomsByCode.values()) {
+    if (room.members.has(userId)) return room;
+  }
+  return undefined;
+}
+
+/** User may only belong to one watch room at a time. */
+export function localLeaveRoom(userId: string): void {
+  const room = findRoomForUser(userId);
+  if (!room) return;
+  room.members.delete(userId);
+  if (room.members.size === 0) {
+    roomsByCode.delete(room.inviteCode);
+  }
+  notifyRoomsChanged();
+}
+
+export function localGetActiveRoomForUser(userId: string): WatchRoomSession | null {
+  const room = findRoomForUser(userId);
+  return room ? toSession(room) : null;
+}
+
 export function subscribeLocalComments(
   roomId: string,
   promptId: string,
@@ -168,4 +199,26 @@ export function subscribeLocalComments(
   return bus.on('comment', (comment) => {
     if (comment.roomId === roomId && comment.promptId === promptId) onComment(comment);
   });
+}
+
+/** @deprecated Prefer localGetActiveRoomForUser — users belong to at most one room. */
+export function localListRoomsForUser(userId: string): WatchRoomSession[] {
+  const active = localGetActiveRoomForUser(userId);
+  return active ? [active] : [];
+}
+
+export function subscribeLocalRoomsChanged(onChange: () => void): () => void {
+  const offJoin = bus.on('memberJoined', onChange);
+  const offChange = bus.on('roomChanged', onChange);
+  return () => {
+    offJoin();
+    offChange();
+  };
+}
+
+/** Drop all local watch rooms (dev reset). */
+export function resetLocalRoomStore(): void {
+  roomsByCode.clear();
+  commentsByKey.clear();
+  notifyRoomsChanged();
 }

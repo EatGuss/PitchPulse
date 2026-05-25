@@ -38,9 +38,9 @@ Static title card before the recording cuts to the browser, OR an overlay strip:
 > **PitchPulse — Real-time social Bundesliga matchday companion**
 > DFL Fan Squad · Challenge 3
 
-### 0:03 — Cold open: onboarding + Mode Picker (12 sec)
+### 0:03 — Cold open: onboarding + Home tab (12 sec)
 
-Full `/demo` screen. Complete onboarding on **both** phones (Alice left, Bob right). Both land on the **Mode Picker**.
+Full `/demo` screen. Complete onboarding on **both** phones (Alice left, Bob right). Both land on **Home**.
 
 **Overlay copy:**
 > Two fans · zero signup · pick your mode
@@ -153,5 +153,3 @@ End at ≤ 3:00.
 - ❌ Don't go past 3:00. Recut if needed.
 
 ## Narrative cheat (editor note)
-
-The original Gate G brief showed Alice briefly in Public Match before joining Bob's room. The script above goes straight to both in a Watch Room — cleaner for a 3-minute cap. If you want the two-mode contrast, insert a 10-second Public Match clip between 0:15 and 0:30 and trim the gamification section accordingly.

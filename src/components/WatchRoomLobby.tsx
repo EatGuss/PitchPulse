@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { DemoUserId } from '../data/personas';
 import { DEMO_USERS } from '../data/personas';
+import { getFixtureById, resolveFixtureTitle } from '../domain/matchday';
 import type { WatchRoomSession } from '../domain/watchRoomTypes';
 import { useWatchRoomLobby } from '../hooks/useWatchRoomLobby';
 import './WatchRoomLobby.css';
@@ -8,18 +9,23 @@ import './WatchRoomLobby.css';
 export interface WatchRoomLobbyProps {
   userId: DemoUserId;
   initialSession: WatchRoomSession;
-  onLeave: () => void;
+  onMinimize: () => void;
+  onLeaveRoom: () => void | Promise<void>;
   onMatchStarted: (session: WatchRoomSession) => void;
 }
 
 export function WatchRoomLobby({
   userId,
   initialSession,
-  onLeave,
+  onMinimize,
+  onLeaveRoom,
   onMatchStarted,
 }: WatchRoomLobbyProps) {
   const { session, members, isHost, matchStarted, toast, copyCode, startMatch } =
     useWatchRoomLobby(userId, initialSession);
+
+  const fixture = getFixtureById(session.matchId);
+  const matchLabel = fixture ? resolveFixtureTitle(fixture) : session.matchId;
 
   const startedRef = useRef(false);
 
@@ -47,11 +53,17 @@ export function WatchRoomLobby({
       )}
 
       <div className="wr-lobby__hero">
-        <button type="button" className="wr-lobby__back" onClick={onLeave}>
-          ← Leave room
-        </button>
+        <div className="wr-lobby__nav">
+          <button type="button" className="wr-lobby__minimize" onClick={onMinimize}>
+            ↓ Minimize
+          </button>
+          <button type="button" className="wr-lobby__leave" onClick={() => void onLeaveRoom()}>
+            Leave room
+          </button>
+        </div>
         <p className="wr-lobby__eyebrow">WATCH ROOM</p>
         <h1 className="wr-lobby__name">{session.roomName}</h1>
+        <p className="wr-lobby__match">{matchLabel}</p>
         <p className="wr-lobby__status">
           {isHost
             ? 'Share your invite code — start when everyone is in'

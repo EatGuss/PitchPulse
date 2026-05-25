@@ -1,0 +1,108 @@
+.ht-toggle {
+  width: 100%;
+}
+
+.ht-toggle__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--pp-border);
+  background: var(--pp-surface-3);
+  color: var(--pp-text);
+  text-align: left;
+  transition: border-color var(--pp-d-fast) var(--pp-ease), background var(--pp-d-fast) var(--pp-ease);
+}
+
+.ht-toggle.is-on .ht-toggle__btn {
+  border-color: rgba(255, 120, 48, 0.55);
+  background: linear-gradient(135deg, rgba(255, 120, 48, 0.12), rgba(255, 60, 90, 0.08));
+}
+
+.ht-toggle__btn:disabled {
+  opacity: 0.55;
+}
+
+.ht-toggle__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ht-toggle__copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ht-toggle__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ht-toggle__sub {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+}
+
+.ht-toggle__pill {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ht-toggle__pill::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  transition: transform var(--pp-d-fast) var(--pp-ease), background var(--pp-d-fast) var(--pp-ease);
+}
+
+.ht-toggle__pill.is-active {
+  background: rgba(255, 120, 48, 0.45);
+}
+
+.ht-toggle__pill.is-active::after {
+  transform: translateX(16px);
+  background: #ffb347;
+}
+
+.ps-rival-ht {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffb347;
+  background: rgba(255, 120, 48, 0.14);
+  border: 1px solid rgba(255, 120, 48, 0.35);
+  animation: ps-rival-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ps-rival-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+.ps-hint.is-hot-win {
+  color: #ffb347;
+  font-weight: 700;
+}
+
+.ps-hint.is-hot-lose {
+  color: var(--pp-text-muted);
+}

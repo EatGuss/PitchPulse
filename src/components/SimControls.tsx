@@ -10,8 +10,11 @@ import { useEffect, useState } from 'react';
 import { getMatchSim } from '../sim/matchSim';
 import { isAwsMode } from '../aws/config';
 import { awsResetMatch, awsStartMatch } from '../aws/bridge';
+import { resetDemoClientState } from '../sim/resetDemoState';
 import type { MatchClockState } from '../domain/types';
 import './SimControls.css';
+
+const isDevBuild = import.meta.env.DEV;
 
 export interface SimControlsProps {
   /** Visual variant — 'demo' is the larger inter-phone bar, 'inline' is in-phone. */
@@ -23,6 +26,7 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
   const [clock, setClock] = useState<MatchClockState>(sim.getState());
   const [paused, setPaused] = useState(() => sim.isPaused());
   const [pending, setPending] = useState(false);
+  const [demoResetNote, setDemoResetNote] = useState<string | null>(null);
 
   useEffect(() => {
     return sim.bus.on('clock', (c) => {
@@ -55,9 +59,7 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
   const onPause = () => sim.pause();
 
   const onReset = async () => {
-    sim.reset();
     if (isAwsMode) {
-      // Server-side emitter keeps streaming until the CLOCK row is reset.
       setPending(true);
       try {
         await awsResetMatch();
@@ -66,7 +68,19 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
       } finally {
         setPending(false);
       }
+      return;
     }
+    sim.reset();
+  };
+
+  const onResetDemoState = () => {
+    const result = resetDemoClientState();
+    setDemoResetNote(
+      result.awsMode
+        ? 'Demo state cleared locally. AWS ranked/standings may return after refresh.'
+        : 'Demo state cleared — ranked, standings, and rooms reset.',
+    );
+    window.setTimeout(() => setDemoResetNote(null), 4000);
   };
 
   const canStart =
@@ -102,10 +116,26 @@ export function SimControls({ variant = 'inline' }: SimControlsProps) {
         <button type="button" className="simctl__btn simctl__btn--ghost" onClick={onReset}>
           ↺ Reset
         </button>
+        {isDevBuild ? (
+          <button
+            type="button"
+            className="simctl__btn simctl__btn--ghost simctl__btn--dev"
+            onClick={onResetDemoState}
+            title="Clears ranked matchday, standings seeds, and local watch rooms"
+          >
+            ⌫ Demo state
+          </button>
+        ) : null}
       </div>
+      {demoResetNote ? (
+        <p className="simctl__reset-note" role="status">
+          {demoResetNote}
+        </p>
+      ) : null}
       {variant === 'demo' && (
         <div className="simctl__hint">
           Both phones below subscribe to the same emitter. Press Kick off to start the replay.
+          {isDevBuild ? ' Use Demo state to clear ranked + standings between test runs.' : null}
         </div>
       )}
     </div>

@@ -21,7 +21,7 @@
 
 import { generateClient } from 'aws-amplify/api';
 import { MATCH_ID, isAwsMode } from './config';
-import { FIRE_REACTION, START_MATCH, SUB_MATCH_CLOCK, SUB_MATCH_EVENT, SUB_ROOM_REACTION } from './operations';
+import { FIRE_REACTION, RESET_MATCH, START_MATCH, SUB_MATCH_CLOCK, SUB_MATCH_EVENT, SUB_ROOM_REACTION } from './operations';
 import { getMatchSim } from '../sim/matchSim';
 import { getWatchRoomEngine, REACTION_EMOJIS, type ReactionEmoji } from '../sim/watchRoomEngine';
 import type { MatchClockState, NormalizedEvent, NormalizedEventType, MatchPhase } from '../domain/types';
@@ -197,9 +197,21 @@ export async function awsStartMatch(): Promise<void> {
   }
 }
 
-/** Reset the server-side match timeline (same as kick off — seq restarts at 0). */
+/** Reset the server-side match timeline without starting playback. */
 export async function awsResetMatch(): Promise<void> {
-  return awsStartMatch();
+  const client = generateClient();
+  console.info('[aws-bridge] calling resetMatch mutation for %s', MATCH_ID);
+  getMatchSim().reset();
+  try {
+    const res = await client.graphql({
+      query: RESET_MATCH,
+      variables: { input: { matchId: MATCH_ID } },
+    });
+    console.info('[aws-bridge] resetMatch ok', res);
+  } catch (err) {
+    console.error('[aws-bridge] resetMatch FAILED', err);
+    throw err;
+  }
 }
 
 /** Broadcast a reaction emoji to all connected viewers in a room. */

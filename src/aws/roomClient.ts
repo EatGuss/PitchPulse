@@ -16,10 +16,12 @@ import {
   getLocalComments,
   localCreateRoom,
   localJoinRoom,
+  localLeaveRoom,
   localPostComment,
   subscribeLocalComments,
   subscribeLocalMemberJoined,
 } from '../sim/localRoomStore';
+import { clearMinimizedWatchRoom } from '../sim/watchRoomMinimizedStore';
 
 interface SubscriptionLike<T> {
   subscribe: (handlers: {
@@ -47,16 +49,18 @@ interface JoinRoomResponse {
 export async function createWatchRoom(
   userId: string,
   displayName: string,
+  matchId: string = MATCH_ID,
 ): Promise<WatchRoomSession> {
+  clearMinimizedWatchRoom(userId);
   if (!isAwsMode) {
-    return localCreateRoom(userId, displayName);
+    return localCreateRoom(userId, displayName, matchId);
   }
 
   const client = generateClient();
   const res = (await client.graphql({
     query: CREATE_ROOM,
     variables: {
-      input: { matchId: MATCH_ID, userId, displayName },
+      input: { matchId, userId, displayName },
     },
   })) as { data?: CreateRoomResponse };
 
@@ -84,6 +88,8 @@ export async function joinWatchRoom(
     throw new Error('Invite code must be in XXX-XXX format');
   }
 
+  clearMinimizedWatchRoom(userId);
+
   if (!isAwsMode) {
     return joinPayloadToSession(localJoinRoom(inviteCode, userId, displayName));
   }
@@ -104,6 +110,15 @@ export async function joinWatchRoom(
   if (!payload) throw new Error('joinRoom returned no data');
 
   return joinPayloadToSession(payload);
+}
+
+export async function leaveWatchRoom(userId: string): Promise<void> {
+  clearMinimizedWatchRoom(userId);
+  if (!isAwsMode) {
+    localLeaveRoom(userId);
+    return;
+  }
+  // AWS leave-room mutation not wired in demo MVP.
 }
 
 export function subscribeWatchRoomMembers(

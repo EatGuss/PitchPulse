@@ -19,6 +19,7 @@ import type { PromptInstance } from '../domain/promptTypes';
 import type { RoomMember } from '../domain/watchRoomTypes';
 import { PROMPT_WINDOW_MS } from '../sim/promptEngine';
 import { LivePickReveal, type PickRevealMode } from './LivePickReveal';
+import { HotTakeToggle } from './HotTakeToggle';
 import { PromptCommentThread } from './PromptCommentThread';
 import './PromptSheet.css';
 
@@ -33,6 +34,13 @@ export interface PromptSheetProps {
   roomId?: string;
   /** Freezes the vote countdown while the match sim is paused. */
   matchPaused?: boolean;
+  /** Ranked 1v1 — fixed baseReward per correct pick (no odds multiplier). */
+  fixedScoring?: boolean;
+  /** Ranked hot take toggle + rival indicator (Gate J). */
+  hotTakeRemaining?: number;
+  hotTakeOn?: boolean;
+  onHotTakeChange?: (on: boolean) => void;
+  rivalHotTakeActive?: boolean;
 }
 
 const WINDOW_REAL_SEC = PROMPT_WINDOW_MS / 1000;
@@ -122,6 +130,11 @@ export function PromptSheet({
   roomMembers = [],
   roomId,
   matchPaused = false,
+  fixedScoring = false,
+  hotTakeRemaining,
+  hotTakeOn = false,
+  onHotTakeChange,
+  rivalHotTakeActive = false,
 }: PromptSheetProps) {
   // Auto-dismiss the resolved overlay shortly after resolution.
   // (The engine clears `active` after 3.2s; we fade out a touch earlier.)
@@ -190,18 +203,17 @@ export function PromptSheet({
   const winnerId = prompt.winningOptionId;
   const myWon = showResult && myPickedOptionId !== null && myPickedOptionId === winnerId;
   const myPayout = prompt.payouts?.[viewerId] ?? 0;
-  // Match points animation lives in MatchPoints — driven by useMatchPoints.
-  // This sheet only narrates the result.)
+  const myHotTake = prompt.userHotTakes?.[viewerId] === true;
+  const showHotTakeToggle =
+    fixedScoring &&
+    prompt.state === 'open' &&
+    hotTakeRemaining !== undefined &&
+    onHotTakeChange !== undefined;
 
   const pickedOption = prompt.options.find((o) => o.id === myPickedOptionId) ?? null;
   const satOut = myPickedOptionId === null;
   const canCollapse =
     prompt.state === 'open' || prompt.state === 'locked' || (prompt.state === 'resolved' && satOut);
-
-  const onDismiss = () => {
-    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-    setDismissed(true);
-  };
 
   // ── Collapsed view: thin pill at the bottom, lets the event feed breathe.
   if (visible && collapsed && canCollapse) {
@@ -302,14 +314,44 @@ export function PromptSheet({
                 server-side — late votes don&apos;t count.
               </li>
               <li>
-                <strong>Odds reward minority correct picks.</strong> Payout = base ×
-                <span className="tabular"> min(1 / your_vote_share, 5.0)</span>.
+                {fixedScoring ? (
+                  <>
+                    <strong>Fixed points in ranked.</strong> Correct picks earn the
+                    full base reward — no odds multiplier in 1v1.
+                    {hotTakeRemaining !== undefined && (
+                      <>
+                        {' '}
+                        <strong>Hot Takes</strong> (2 per match) pay 2.5× when correct.
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <strong>Odds reward minority correct picks.</strong> Payout = base ×
+                    <span className="tabular"> min(1 / your_vote_share, 5.0)</span>.
+                  </>
+                )}
               </li>
               <li>
                 <strong>Wrong = 0 points.</strong> Never negative. Never real money.
               </li>
             </ul>
           </div>
+        )}
+
+        {rivalHotTakeActive && prompt.state !== 'resolved' && (
+          <div className="ps-rival-ht" role="status">
+            🔥 Rival went Hot Take
+          </div>
+        )}
+
+        {showHotTakeToggle && (
+          <HotTakeToggle
+            remaining={hotTakeRemaining}
+            enabled={hotTakeOn}
+            onChange={onHotTakeChange}
+            disabled={myPickedOptionId !== null}
+          />
         )}
 
         <div className="ps__opts">
@@ -356,7 +398,10 @@ export function PromptSheet({
 
         {prompt.state === 'open' && (
           <p className="ps__hint">
-            <span className="ps__hint-i">ⓘ</span> Vote within {WINDOW_REAL_SEC}s. Odds reward minority correct picks.
+            <span className="ps__hint-i">ⓘ</span>{' '}
+            {fixedScoring
+              ? `Vote within ${WINDOW_REAL_SEC}s. Correct picks earn fixed points in ranked.`
+              : `Vote within ${WINDOW_REAL_SEC}s. Odds reward minority correct picks.`}
           </p>
         )}
         {prompt.state === 'locked' && (
@@ -365,12 +410,28 @@ export function PromptSheet({
           </p>
         )}
         {prompt.state === 'resolved' && (
-          <p className={`ps__hint ${myWon ? 'is-win' : 'is-lose'}`}>
+          <p
+            className={`ps__hint ${
+              myPickedOptionId === null
+                ? ''
+                : myWon
+                  ? myHotTake
+                    ? 'is-win is-hot-win'
+                    : 'is-win'
+                  : myHotTake
+                    ? 'is-hot-lose'
+                    : 'is-lose'
+            }`}
+          >
             {myPickedOptionId === null
               ? 'You sat this one out.'
               : myWon
-                ? `Nice call. Points on the way. ${myPayout > 0 ? `+${myPayout} pts` : ''}`
-                : 'Better luck on the next one.'}
+                ? myHotTake
+                  ? `🔥 Hot Take nailed! +${myPayout} pts (2.5×)`
+                  : `Nice call. Points on the way. ${myPayout > 0 ? `+${myPayout} pts` : ''}`
+                : myHotTake
+                  ? 'Hot Take missed — bold call, zero points.'
+                  : 'Better luck on the next one.'}
           </p>
         )}
       </div>

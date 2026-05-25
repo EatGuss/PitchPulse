@@ -1,0 +1,95 @@
+.compete-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border-radius: 999px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+}
+
+.compete-toggle__btn {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pp-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.compete-toggle__btn--active {
+  background: var(--pp-accent);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(225, 14, 31, 0.28);
+}
+
+.compete-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.compete-live__feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--pp-r-lg);
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.compete-live__feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compete-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px rgba(225, 14, 31, 0.6);
+}
+
+.compete-live__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pp-text);
+}
+
+.compete-live__sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+}
+
+.compete-live__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compete-live__empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--pp-text-muted);
+  text-align: center;
+}
+
+.compete-live__match {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pp-text-faint);
+}

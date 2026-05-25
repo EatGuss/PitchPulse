@@ -2,8 +2,7 @@
  * useWatchRoom — subscribes a component to the WatchRoomEngine's reaction stream.
  *
  * When `roomId` is set (private Watch Room), reactions also broadcast via
- * AppSync using that room id. Public match passes no roomId and uses the
- * in-memory engine only (or matchId-as-roomId in AWS public mode).
+ * AppSync using that room id. Without a roomId, reactions stay in the in-memory engine only.
  */
 
 import { useCallback, useEffect, useState } from 'react';

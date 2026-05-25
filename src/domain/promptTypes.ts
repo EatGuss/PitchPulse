@@ -93,6 +93,8 @@ export interface PromptInstance {
   voteCounts: Record<string, number>;
   /** Per-user picks. Visible to user themselves; not shown to others in the sheet. */
   userVotes: Record<string, string>; // userId -> optionId
+  /** Ranked hot-take flag per user for this prompt. */
+  userHotTakes?: Record<string, boolean>;
   winningOptionId?: string;
   resolvedAtMinute?: number;
   /** Per-user payout after resolution. */

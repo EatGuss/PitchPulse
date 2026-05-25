@@ -1,7 +1,6 @@
 // AppSync JS resolver — Mutation.fireReaction (DynamoDB data source = pp-rooms).
 //
-// Persists under ROOM#<roomId>/REACTION#<ts>#<id>. Public Match passes the
-// global matchId as roomId; Watch Room passes the private room UUID.
+// Persists under ROOM#<roomId>/REACTION#<ts>#<id>. Watch Room passes the private room UUID.
 
 import { util } from '@aws-appsync/utils';
 import * as ddb from '@aws-appsync/utils/dynamodb';

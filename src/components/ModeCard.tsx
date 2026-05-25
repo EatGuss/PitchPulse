@@ -6,6 +6,7 @@ export interface ModeCardProps {
   icon: string;
   onSelect: () => void;
   variant?: 'default' | 'accent';
+  disabled?: boolean;
 }
 
 export function ModeCard({
@@ -14,12 +15,14 @@ export function ModeCard({
   icon,
   onSelect,
   variant = 'default',
+  disabled = false,
 }: ModeCardProps) {
   return (
     <button
       type="button"
-      className={`mode-card mode-card--${variant}`}
+      className={`mode-card mode-card--${variant}${disabled ? ' mode-card--disabled' : ''}`}
       onClick={onSelect}
+      disabled={disabled}
       aria-label={title}
     >
       <span className="mode-card__icon" aria-hidden="true">

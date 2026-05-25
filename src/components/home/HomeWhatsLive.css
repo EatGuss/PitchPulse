@@ -1,0 +1,98 @@
+.hwlive {
+  display: flex;
+  flex-direction: column;
+}
+.hwlive__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--pp-r-lg);
+  background: linear-gradient(160deg, rgba(225, 14, 31, 0.12), var(--pp-surface));
+  border: 1px solid rgba(225, 14, 31, 0.35);
+  text-align: left;
+}
+.hwlive__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hwlive__head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hwlive__live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pp-success);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+  animation: hwlive-pulse 1.4s ease-in-out infinite;
+}
+@keyframes hwlive-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.92); }
+}
+.hwlive__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pp-text);
+}
+.hwlive__chev {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pp-accent);
+  white-space: nowrap;
+}
+.hwlive__match {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+}
+.hwlive__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hwlive__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--pp-r-md);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--pp-border);
+}
+.hwlive__headline {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pp-text);
+}
+.hwlive__sub {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+}
+.hwlive__waiting {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--pp-r-md);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed var(--pp-border-strong);
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  line-height: 1.4;
+}
+.hwlive__tap {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pp-text-faint);
+}

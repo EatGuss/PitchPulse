@@ -4,28 +4,42 @@ import { DEMO_USERS } from '../data/personas';
 import { createWatchRoom, joinWatchRoom } from '../aws/roomClient';
 import type { WatchRoomSession } from '../domain/watchRoomTypes';
 import { isInviteCodeComplete, normalizeInviteCode } from '../domain/watchRoomTypes';
+import { SelectMatchModal } from './home/SelectMatchModal';
+import { useMatchdaySchedule } from '../hooks/useMatchdaySchedule';
+import { WatchRoomMinimizedCard } from './WatchRoomMinimizedCard';
 import './WatchRoomEntry.css';
 
 export interface WatchRoomEntryProps {
   userId: DemoUserId;
+  activeRoom: WatchRoomSession | null;
   onBack: () => void;
   onJoined: (session: WatchRoomSession) => void;
+  onOpenRoom: (session: WatchRoomSession) => void;
+  onLeaveRoom: () => void | Promise<void>;
 }
 
-type Step = 'menu' | 'enterCode';
+type Step = 'menu' | 'enterCode' | 'pickMatch';
 
-export function WatchRoomEntry({ userId, onBack, onJoined }: WatchRoomEntryProps) {
+export function WatchRoomEntry({
+  userId,
+  activeRoom,
+  onBack,
+  onJoined,
+  onOpenRoom,
+  onLeaveRoom,
+}: WatchRoomEntryProps) {
   const user = DEMO_USERS[userId];
+  const schedule = useMatchdaySchedule();
   const [step, setStep] = useState<Step>('menu');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const runCreate = async () => {
+  const runCreate = async (matchId: string) => {
     setBusy(true);
     setError(null);
     try {
-      const session = await createWatchRoom(userId, user.displayName);
+      const session = await createWatchRoom(userId, user.displayName, matchId);
       onJoined(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create room');
@@ -67,33 +81,46 @@ export function WatchRoomEntry({ userId, onBack, onJoined }: WatchRoomEntryProps
         </button>
         <h1 className="wr-entry__title">Watch Room</h1>
         <p className="wr-entry__sub">
-          Private room for you and friends — live picks, reactions, and comments.
+          One room at a time — create or join with an invite code.
         </p>
       </div>
 
+      {activeRoom && step === 'menu' && (
+        <WatchRoomMinimizedCard
+          room={activeRoom}
+          onOpen={() => onOpenRoom(activeRoom)}
+          onLeave={() => void onLeaveRoom()}
+        />
+      )}
+
       {step === 'menu' ? (
-        <div className="wr-entry__actions">
-          <button
-            type="button"
-            className="wr-entry__primary"
-            onClick={() => void runCreate()}
-            disabled={busy}
-          >
-            {busy ? 'Creating…' : 'Create Room'}
-          </button>
-          <button
-            type="button"
-            className="wr-entry__secondary"
-            onClick={() => {
-              setStep('enterCode');
-              setError(null);
-            }}
-            disabled={busy}
-          >
-            Enter Code
-          </button>
-        </div>
-      ) : (
+        !activeRoom && (
+          <div className="wr-entry__actions">
+            <button
+              type="button"
+              className="wr-entry__primary"
+              onClick={() => {
+                setStep('pickMatch');
+                setError(null);
+              }}
+              disabled={busy}
+            >
+              Create Room
+            </button>
+            <button
+              type="button"
+              className="wr-entry__secondary"
+              onClick={() => {
+                setStep('enterCode');
+                setError(null);
+              }}
+              disabled={busy}
+            >
+              Enter Code
+            </button>
+          </div>
+        )
+      ) : step === 'enterCode' ? (
         <div className="wr-entry__join">
           <p className="wr-entry__label">INVITE CODE</p>
           <input
@@ -133,7 +160,20 @@ export function WatchRoomEntry({ userId, onBack, onJoined }: WatchRoomEntryProps
             ← Back to options
           </button>
         </div>
-      )}
+      ) : null}
+
+      <SelectMatchModal
+        open={step === 'pickMatch'}
+        mode="room"
+        schedule={schedule}
+        onClose={() => {
+          if (!busy) setStep('menu');
+        }}
+        onPick={(fixtureId) => {
+          setStep('menu');
+          void runCreate(fixtureId);
+        }}
+      />
 
       {error && (
         <p className="wr-entry__error" role="alert">

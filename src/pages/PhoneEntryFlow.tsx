@@ -1,20 +1,12 @@
 /**
- * PhoneEntryFlow — onboarding → mode picker → match (or Watch Room stub).
- * Shared by `/` (SinglePhonePage) and `/demo` (each phone frame).
- *
- * URL params (SinglePhonePage only):
- *   ?as=alice|bob       → skip onboarding, land on mode picker
- *   ?as=alice&mode=public → skip straight to Public Match
+ * PhoneEntryFlow — onboarding → 4-tab AppShell.
+ * Mode Picker removed (Gate C). Users land on Home after onboarding.
  */
 
 import { useEffect, useState } from 'react';
 import { OnboardingScreen } from '../components/OnboardingScreen';
-import { ModePicker } from '../components/ModePicker';
-import { WatchRoomFlow } from '../components/WatchRoomFlow';
-import { RankedFlow } from '../components/RankedFlow';
-import { MatchPage } from './MatchPage';
+import { AppShell } from '../components/AppShell';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
-import { isPlayMode, type PlayMode } from '../domain/playMode';
 
 function isDemoUserId(value: string | null): value is DemoUserId {
   return value !== null && value in DEMO_USERS;
@@ -22,36 +14,14 @@ function isDemoUserId(value: string | null): value is DemoUserId {
 
 export interface PhoneEntryFlowProps {
   hideSimControls?: boolean;
-  /** Persist selection in URL via history.replaceState (single-phone route). */
   syncUrl?: boolean;
-  /** Notify parent when the chosen demo user changes (phone chrome label). */
   onUserChange?: (userId: DemoUserId | null) => void;
 }
 
-function readUrlState(): { userId: DemoUserId | null; mode: PlayMode | null } {
-  if (typeof window === 'undefined') return { userId: null, mode: null };
-  const params = new URLSearchParams(window.location.search);
-  const rawUser = params.get('as');
-  const rawMode = params.get('mode');
-  const userId = isDemoUserId(rawUser) ? rawUser : null;
-  const mode = userId !== null && isPlayMode(rawMode) ? rawMode : null;
-  return { userId, mode };
-}
-
-function writeUrlState(userId: DemoUserId | null, mode: PlayMode | null) {
-  const url = new URL(window.location.href);
-  if (userId === null) {
-    url.searchParams.delete('as');
-    url.searchParams.delete('mode');
-  } else {
-    url.searchParams.set('as', userId);
-    if (mode === null) {
-      url.searchParams.delete('mode');
-    } else {
-      url.searchParams.set('mode', mode);
-    }
-  }
-  window.history.replaceState({}, '', url.toString());
+function readUrlUserId(): DemoUserId | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('as');
+  return isDemoUserId(raw) ? raw : null;
 }
 
 export function PhoneEntryFlow({
@@ -59,16 +29,9 @@ export function PhoneEntryFlow({
   syncUrl = false,
   onUserChange,
 }: PhoneEntryFlowProps) {
-  const [userId, setUserId] = useState<DemoUserId | null>(() => {
-    if (!syncUrl) return null;
-    return readUrlState().userId;
-  });
-
-  const [mode, setMode] = useState<PlayMode | null>(() => {
-    if (!syncUrl) return null;
-    const { userId: urlUser, mode: urlMode } = readUrlState();
-    return urlUser !== null ? urlMode : null;
-  });
+  const [userId, setUserId] = useState<DemoUserId | null>(() =>
+    syncUrl ? readUrlUserId() : null,
+  );
 
   useEffect(() => {
     onUserChange?.(userId);
@@ -76,76 +39,45 @@ export function PhoneEntryFlow({
 
   useEffect(() => {
     if (!syncUrl) return;
-    const onPop = () => {
-      const { userId: u, mode: m } = readUrlState();
-      setUserId(u);
-      setMode(m);
-    };
+    const onPop = () => setUserId(readUrlUserId());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [syncUrl]);
 
   const handleContinue = (chosen: DemoUserId) => {
     setUserId(chosen);
-    setMode(null);
-    if (syncUrl) writeUrlState(chosen, null);
-  };
-
-  const handleSelectMode = (chosen: PlayMode) => {
-    setMode(chosen);
-    if (syncUrl && userId) writeUrlState(userId, chosen);
+    if (syncUrl) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('as', chosen);
+      url.searchParams.set('tab', 'home');
+      url.searchParams.delete('mode');
+      url.searchParams.delete('compete');
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   const handleSwitchUser = () => {
     setUserId(null);
-    setMode(null);
-    if (syncUrl) writeUrlState(null, null);
-  };
-
-  const handleBackToModePicker = () => {
-    setMode(null);
-    if (syncUrl && userId) writeUrlState(userId, null);
+    if (syncUrl) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('as');
+      url.searchParams.delete('tab');
+      url.searchParams.delete('compete');
+      url.searchParams.delete('mode');
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   if (userId === null) {
     return <OnboardingScreen onContinue={handleContinue} />;
   }
 
-  if (mode === null) {
-    return (
-      <ModePicker
-        userId={userId}
-        onSelectMode={handleSelectMode}
-        onSwitchUser={handleSwitchUser}
-      />
-    );
-  }
-
-  if (mode === 'watchRoom') {
-    return (
-      <WatchRoomFlow
-        userId={userId}
-        hideSimControls={hideSimControls}
-        onBack={handleBackToModePicker}
-      />
-    );
-  }
-
-  if (mode === 'ranked') {
-    return (
-      <RankedFlow
-        userId={userId}
-        hideSimControls={hideSimControls}
-        onBack={handleBackToModePicker}
-      />
-    );
-  }
-
   return (
-    <MatchPage
+    <AppShell
       userId={userId}
       hideSimControls={hideSimControls}
       onSwitchUser={handleSwitchUser}
+      syncUrl={syncUrl}
     />
   );
 }

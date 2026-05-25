@@ -1,0 +1,4 @@
+{
+  "info": { "fieldName": "weeklyLeaderboard" },
+  "arguments": { "limit": 10 }
+}

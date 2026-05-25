@@ -1,0 +1,111 @@
+.live-feed-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.live-feed-sheet.is-visible {
+  pointer-events: auto;
+}
+
+.live-feed-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: var(--pp-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity var(--pp-d-med) var(--pp-ease);
+  pointer-events: auto;
+}
+.live-feed-sheet.is-visible .live-feed-sheet__backdrop {
+  opacity: 1;
+}
+
+.live-feed-sheet__panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: 85%;
+  min-height: 0;
+  width: 100%;
+  padding: 10px 16px 16px;
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(180deg, var(--pp-surface-2) 0%, var(--pp-surface) 100%);
+  border-top: 1px solid var(--pp-border-strong);
+  box-shadow: 0 -16px 40px -12px rgba(0, 0, 0, 0.55);
+  transform: translateY(110%);
+  transition: transform var(--pp-d-slow) var(--pp-ease);
+  pointer-events: auto;
+}
+.live-feed-sheet.is-visible .live-feed-sheet__panel {
+  transform: translateY(0);
+}
+
+.live-feed-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  align-self: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.live-feed-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.live-feed-sheet__head-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.live-feed-sheet__live-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--pp-success);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+}
+.live-feed-sheet__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--pp-text);
+}
+.live-feed-sheet__close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--pp-text-muted);
+  font-size: 22px;
+  line-height: 1;
+}
+.live-feed-sheet__sub {
+  margin: 4px 0 12px;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--pp-text-muted);
+  flex-shrink: 0;
+}
+.live-feed-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

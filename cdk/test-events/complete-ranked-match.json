@@ -1,0 +1,12 @@
+{
+  "info": {
+    "fieldName": "completeRankedMatch"
+  },
+  "arguments": {
+    "matchId": "DFL-MAT-000001",
+    "winnerId": "alice",
+    "loserId": "bob",
+    "winnerMatchPoints": 580,
+    "loserMatchPoints": 320
+  }
+}

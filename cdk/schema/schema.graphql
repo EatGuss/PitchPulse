@@ -59,7 +59,16 @@ type Vote @aws_iam {
   promptId: ID!
   userId: ID!
   optionId: String!
+  hotTake: Boolean
   votedAt: AWSTimestamp!
+}
+
+type HotTakeSignal @aws_iam {
+  matchId: ID!
+  promptId: ID!
+  userId: ID!
+  rivalUserId: ID!
+  ts: AWSTimestamp!
 }
 
 # ─── Watch Room (private friend-group matchday) ──────────────────────────────
@@ -206,6 +215,15 @@ input SubmitVoteInput {
   promptId: ID!
   userId: ID!
   optionId: String!
+  hotTake: Boolean
+  rankedMode: Boolean
+}
+
+input SignalHotTakeInput {
+  matchId: ID!
+  promptId: ID!
+  userId: ID!
+  rivalUserId: ID!
 }
 
 input StartMatchInput {
@@ -254,20 +272,90 @@ type StartMatchResult @aws_iam {
   isRunning: Boolean!
 }
 
+# ─── Ranked matchday commitment (Gate E) ─────────────────────────────────────
+
+type RankedMatchdayStatus @aws_iam {
+  matchdayId: ID!
+  lockedFixtureId: ID
+  lockedFixtureLabel: String
+  played: Boolean!
+  matchPoints: Int
+}
+
+input LockInRankedInput {
+  userId: ID!
+  matchdayId: ID!
+  fixtureId: ID!
+  fixtureLabel: String!
+}
+
 # ─── Queries (minimal — used to bootstrap a late-joining client) ─────────────
+
+enum LeaderboardPeriod {
+  WEEKLY
+  SEASONAL
+}
+
+type LeaderboardEntry @aws_iam {
+  rank: Int!
+  userId: ID!
+  displayName: String!
+  equippedTitle: String
+  tier: Tier!
+  points: Int!
+}
+
+type LeaderboardUpdate @aws_iam {
+  period: LeaderboardPeriod!
+  seasonNumber: Int
+  isoWeek: String
+  updatedAt: AWSTimestamp!
+}
+
+type UserStats @aws_iam {
+  userId: ID!
+  weeklyPoints: Int!
+  weeklyRank: Int
+  seasonalPoints: Int!
+  seasonalRank: Int
+  seasonNumber: Int!
+  seasonEndsAt: String
+  weeklyPointsResetAt: String
+  tier: Tier!
+  equippedTitleId: String
+  equippedTitle: String
+  unlockedTitles: [String!]
+  tierWinsTowardNext: Int
+  lifetimeAccuracy: Float
+  rankedMatchesPlayed: Int
+}
+
+input LeaderboardUpdatedInput {
+  period: LeaderboardPeriod!
+  seasonNumber: Int
+  isoWeek: String
+  updatedAt: AWSTimestamp!
+}
 
 type Query @aws_iam {
   ping: String
+  weeklyLeaderboard(limit: Int): [LeaderboardEntry!]!
+  seasonalLeaderboard(seasonNumber: Int, limit: Int): [LeaderboardEntry!]!
+  userStats(userId: String!): UserStats
+  rankedMatchdayStatus(userId: ID!, matchdayId: ID!): RankedMatchdayStatus
 }
 
 # ─── Mutations ───────────────────────────────────────────────────────────────
 
 type Mutation @aws_iam {
   startMatch(input: StartMatchInput!): StartMatchResult
+  resetMatch(input: StartMatchInput!): StartMatchResult
 
   fireReaction(input: FireReactionInput!): RoomReaction
 
   submitVote(input: SubmitVoteInput!): Vote
+  signalHotTake(input: SignalHotTakeInput!): HotTakeSignal
+  initRankedHotTake(userId: ID!, matchId: ID!): Boolean
 
   publishMatchClock(input: MatchClockInput!): MatchClock
 
@@ -284,12 +372,23 @@ type Mutation @aws_iam {
 
   # Ranked + Titles — client-callable
   findRankedMatch(userId: ID!): RankedOpponent
+  lockInRankedMatch(input: LockInRankedInput!): RankedMatchdayStatus
   equipTitle(userId: ID!, titleId: String!): Boolean
+  unlockHotTakeHero(userId: ID!): Boolean
 
   # Ranked + Titles — server-only broadcast
-  completeRankedMatch(matchId: ID!, winnerId: ID!, loserId: ID!): RankedMatchResult
+  completeRankedMatch(
+    matchId: ID!
+    winnerId: ID!
+    loserId: ID!
+    winnerMatchPoints: Int!
+    loserMatchPoints: Int!
+  ): RankedMatchResult
   notifyTierPromoted(userId: ID!, previousTier: Tier!, newTier: Tier!, ts: AWSTimestamp!): TierPromotedEvent
   notifyTitleUnlocked(userId: ID!, titleId: ID!, titleName: String!, ts: AWSTimestamp!): TitleUnlockedEvent
+
+  # Leaderboards — server-only broadcast (Gate B)
+  publishLeaderboardUpdated(input: LeaderboardUpdatedInput!): LeaderboardUpdate
 }
 
 # ─── Subscriptions ───────────────────────────────────────────────────────────
@@ -321,4 +420,10 @@ type Subscription @aws_iam {
 
   titleUnlocked(userId: ID!): TitleUnlockedEvent
     @aws_subscribe(mutations: ["notifyTitleUnlocked"])
+
+  rivalHotTakeSignal(rivalUserId: ID!): HotTakeSignal
+    @aws_subscribe(mutations: ["signalHotTake"])
+
+  leaderboardUpdated(period: LeaderboardPeriod!): LeaderboardUpdate
+    @aws_subscribe(mutations: ["publishLeaderboardUpdated"])
 }

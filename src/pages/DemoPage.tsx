@@ -1,7 +1,7 @@
 /**
  * DemoPage — `/demo` route. Two phone frames side-by-side, shared MatchSim.
  *
- * Each phone: onboarding → ModePicker → Public Match (or Watch Room stub).
+ * Each phone: onboarding → 4-tab AppShell (Home default).
  */
 
 import { PhoneFrame } from '../components/PhoneFrame';

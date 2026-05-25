@@ -1,0 +1,74 @@
+.wr-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--pp-r-md);
+  background: var(--pp-surface-2);
+  border: 1px solid var(--pp-border-strong);
+}
+
+.wr-mini__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wr-mini__badge {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pp-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--pp-border);
+}
+
+.wr-mini__name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pp-text);
+}
+
+.wr-mini__match {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pp-text-muted);
+}
+
+.wr-mini__count {
+  font-size: 11px;
+  color: var(--pp-text-faint);
+}
+
+.wr-mini__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wr-mini__open {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--pp-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.wr-mini__leave {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pp-border-strong);
+  background: transparent;
+  color: var(--pp-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}

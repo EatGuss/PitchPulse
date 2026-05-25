@@ -16,6 +16,16 @@ export const START_MATCH = /* GraphQL */ `
   }
 `;
 
+export const RESET_MATCH = /* GraphQL */ `
+  mutation ResetMatch($input: StartMatchInput!) {
+    resetMatch(input: $input) {
+      matchId
+      startedAtWallMs
+      isRunning
+    }
+  }
+`;
+
 export const FIRE_REACTION = /* GraphQL */ `
   mutation FireReaction($input: FireReactionInput!) {
     fireReaction(input: $input) {
@@ -185,5 +195,141 @@ export const FIND_RANKED_MATCH = /* GraphQL */ `
       opponentTier
       opponentTitle
     }
+  }
+`;
+
+export const RANKED_MATCHDAY_STATUS = /* GraphQL */ `
+  query RankedMatchdayStatus($userId: ID!, $matchdayId: ID!) {
+    rankedMatchdayStatus(userId: $userId, matchdayId: $matchdayId) {
+      matchdayId
+      lockedFixtureId
+      lockedFixtureLabel
+      played
+      matchPoints
+    }
+  }
+`;
+
+export const LOCK_IN_RANKED_MATCH = /* GraphQL */ `
+  mutation LockInRankedMatch($input: LockInRankedInput!) {
+    lockInRankedMatch(input: $input) {
+      matchdayId
+      lockedFixtureId
+      lockedFixtureLabel
+      played
+      matchPoints
+    }
+  }
+`;
+
+export const WEEKLY_LEADERBOARD = /* GraphQL */ `
+  query WeeklyLeaderboard($limit: Int) {
+    weeklyLeaderboard(limit: $limit) {
+      rank
+      userId
+      displayName
+      equippedTitle
+      tier
+      points
+    }
+  }
+`;
+
+export const SEASONAL_LEADERBOARD = /* GraphQL */ `
+  query SeasonalLeaderboard($seasonNumber: Int, $limit: Int) {
+    seasonalLeaderboard(seasonNumber: $seasonNumber, limit: $limit) {
+      rank
+      userId
+      displayName
+      equippedTitle
+      tier
+      points
+    }
+  }
+`;
+
+export const USER_STATS = /* GraphQL */ `
+  query UserStats($userId: String!) {
+    userStats(userId: $userId) {
+      userId
+      weeklyPoints
+      weeklyRank
+      seasonalPoints
+      seasonalRank
+      seasonNumber
+      seasonEndsAt
+      weeklyPointsResetAt
+      tier
+      equippedTitleId
+      equippedTitle
+      lifetimeAccuracy
+      rankedMatchesPlayed
+    }
+  }
+`;
+
+export const EQUIP_TITLE = /* GraphQL */ `
+  mutation EquipTitle($userId: ID!, $titleId: String!) {
+    equipTitle(userId: $userId, titleId: $titleId)
+  }
+`;
+
+export const SUB_LEADERBOARD_UPDATED = /* GraphQL */ `
+  subscription OnLeaderboardUpdated($period: LeaderboardPeriod!) {
+    leaderboardUpdated(period: $period) {
+      period
+      seasonNumber
+      isoWeek
+      updatedAt
+    }
+  }
+`;
+
+export const SUBMIT_VOTE = /* GraphQL */ `
+  mutation SubmitVote($input: SubmitVoteInput!) {
+    submitVote(input: $input) {
+      matchId
+      promptId
+      userId
+      optionId
+      hotTake
+      votedAt
+    }
+  }
+`;
+
+export const SIGNAL_HOT_TAKE = /* GraphQL */ `
+  mutation SignalHotTake($input: SignalHotTakeInput!) {
+    signalHotTake(input: $input) {
+      matchId
+      promptId
+      userId
+      rivalUserId
+      ts
+    }
+  }
+`;
+
+export const INIT_RANKED_HOT_TAKE = /* GraphQL */ `
+  mutation InitRankedHotTake($userId: ID!, $matchId: ID!) {
+    initRankedHotTake(userId: $userId, matchId: $matchId)
+  }
+`;
+
+export const SUB_RIVAL_HOT_TAKE = /* GraphQL */ `
+  subscription OnRivalHotTake($rivalUserId: ID!) {
+    rivalHotTakeSignal(rivalUserId: $rivalUserId) {
+      matchId
+      promptId
+      userId
+      rivalUserId
+      ts
+    }
+  }
+`;
+
+export const UNLOCK_HOT_TAKE_HERO = /* GraphQL */ `
+  mutation UnlockHotTakeHero($userId: ID!) {
+    unlockHotTakeHero(userId: $userId)
   }
 `;

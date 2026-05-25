@@ -27,7 +27,7 @@ Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchC
 
 ## The three pillars
 
-1. **Multiplayer** — two demo users (Alice, Bob) share a matchday session. In **Watch Room** mode they join a private room by invite code; picks reveal live, reactions and comments broadcast room-scoped. In **Public Match** mode picks stay hidden until both have voted.
+1. **Multiplayer** — two demo users (Alice, Bob) share a matchday session. **Ranked** mode is head-to-head competition; **Watch Room** mode is private rooms by invite code with live picks, reactions, and comments. Passive spectating uses the Home **Live Feed** (no participation, no points).
 2. **Real-time data** — a replay emitter reads the anonymized DFL match XML and ticks events out on an accelerated clock (1 match-minute ≈ 2 real seconds). Goal, card, **and** half-time events drive UI changes — plus offside, corner, foul, shot-saved/blocked/missed for richness.
 3. **Gamification** — PitchCoin economy, live leaderboard, collectible badges, streak chip. Correct predictions earn `base_reward × min(1 / your_vote_share, 5.0)` coins. Wrong predictions cost zero — **never negative, never real money**.
 
@@ -155,7 +155,7 @@ Then open:
 - **`http://127.0.0.1:5173/demo`** — the two-phone side-by-side stage used for the demo recording.
 - `http://127.0.0.1:5173/` — single-phone view. You'll see the onboarding screen first; tap **Continue as Alice** (or Bob). Add `?as=bob` to deep-link past onboarding, `?frame=off` for raw mobile preview at 390px.
 
-After onboarding, the **Mode Picker** offers **Public Match** or **Watch Room**. On `/demo`, complete onboarding on both phones, then follow the [Watch Room demo flow](#watch-room-mode) or hit **▶ Kick off** in the center control bar for a quick Public Match replay (~3 minutes).
+After onboarding, the app opens on **Home** with four tabs (Home, Compete, Standings, Me). On `/demo`, complete onboarding on both phones, then follow the [Watch Room demo flow](#watch-room-mode) or use **Compete → Play Ranked** for head-to-head play.
 
 ### Run modes (AWS vs local)
 
@@ -177,21 +177,22 @@ Private invite-code rooms for friends watching the same replay together.
 ### Flow
 
 ```
-Onboarding → Mode Picker → Watch Room
-  → Create Room  → lobby (host sees invite code)
-  → Enter Code   → join as guest
-  → Start Match  → both phones enter MatchPage with room context
+Onboarding → Home (or Compete tab)
+  → Watch Room → Create Room  → lobby (host sees invite code)
+              → Enter Code   → join as guest
+              → Start Match  → both phones enter MatchPage with room context
+  → Ranked     → matchmaking → live ranked match
 ```
 
-### What’s different from Public Match
+### In-room features
 
-| Feature | Public Match | Watch Room |
+| Feature | Watch Room | Ranked |
 |---|---|---|
-| Pick reveal | Hidden until **both** users vote | **Live** — “Bob picked Home” as soon as they tap |
-| Leaderboard | Horizontal strip under score | **Room sidebar** with member balances |
-| Reactions | Broadcast to match scope | Room-scoped; deduped per screen |
-| Comments | — | **140-char plain-text threads** on each prompt (`postComment` / `roomComment`) |
-| Pause | Center **❚❚ Pause** freezes clock, prompts, and AWS injects | Same |
+| Pick reveal | **Live** — “Bob picked Home” as soon as they tap | Hidden until **both** users vote |
+| Leaderboard | **Room sidebar** with member balances | Global strip (match-local points) |
+| Reactions | Room-scoped; deduped per screen | Hidden |
+| Comments | **140-char plain-text threads** on each prompt | Hidden |
+| Pause | Center **❚❚ Pause** freezes clock and prompts | Same |
 
 ### Invite codes
 
@@ -276,9 +277,9 @@ S3 + CloudFront frontend hosting is **deferred** per the brief ("a local running
 Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). The short version (Watch Room cut):
 
 1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames visible top-to-bottom.
-2. Complete onboarding on both phones → **Mode Picker**.
-3. **Bob** taps **Watch Room** → **Create Room** → note the invite code (e.g. `PLZ-482`).
-4. **Alice** taps **Watch Room** → **Enter Code** → joins Bob’s lobby. Bob taps **Start Match**.
+2. Complete onboarding on both phones → **Home** tab.
+3. **Bob** → **Compete** → **Watch Room** → **Create Room** → note the invite code (e.g. `PLZ-482`).
+4. **Alice** → **Compete** → **Watch Room** → **Enter Code** → joins Bob’s lobby. Bob taps **Start Match**.
 5. Click **▶ Kick off** on the center control bar. Both phones tick together.
 6. **Pillar 2:** same event card on both phones within ~200 ms.
 7. **Pillar 1:** prompt fires → Alice votes → Bob sees live pick reveal → Bob votes differently → expand **Comments**, post a 140-char line on both phones.
@@ -307,7 +308,7 @@ Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). 
 **Watch Room feature (`feature/watch-room`):**
 
 - [x] **Gate A** — Bootstrap check (git, AWS stack, dev server)
-- [x] **Gate B** — Mode Picker (Public Match vs Watch Room)
+- [x] **Gate B** — Mode Picker (Watch Room entry; superseded by 4-tab nav)
 - [x] **Gate C** — `pp-rooms` extensions + AppSync schema + `pp-room-handler` Lambda
 - [x] **Gate D** — Create/join flow + lobby
 - [x] **Gate E** — In-room match UX (sidebar, live picks, reactions)

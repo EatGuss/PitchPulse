@@ -1,7 +1,7 @@
 /**
  * Live pick badges below the prompt card.
  *   - watch-room: reveal each member's pick as soon as they vote
- *   - public: reveal only after all demo fans have voted
+ *   - both-voted: reveal only after all demo fans have voted (Ranked)
  */
 
 import { DEMO_USERS, type DemoUserId } from '../data/personas';

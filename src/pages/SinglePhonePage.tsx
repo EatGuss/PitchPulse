@@ -1,12 +1,11 @@
 /**
  * SinglePhonePage — `/` route. Flow inside one PhoneFrame:
  *   1. OnboardingScreen — choose Alice or Bob
- *   2. ModePicker       — Public Match or Watch Room
+ *   2. AppShell          — Home / Compete / Standings / Me
  *   3. MatchPage / WatchRoomStub
  *
  * Query params:
  *   ?as=alice|bob           → skip onboarding
- *   ?as=alice&mode=public   → skip to Public Match
  *   ?frame=off              → drop phone chrome
  */
 

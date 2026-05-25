@@ -1,14 +1,8 @@
 /**
- * start-match — AppSync Lambda data source for Mutation.startMatch.
+ * start-match — AppSync Lambda data source for Mutation.startMatch / resetMatch.
  *
- * Flips the CLOCK item in pp-matches to isRunning=true with a fresh
- * startedAtWallMs anchor. The sim-emitter Lambda (running on the 2-second
- * EventBridge cron) picks up the change on its next tick and begins emitting
- * EVENT items.
- *
- * Idempotent — calling startMatch again resets the timeline to a fresh
- * kickoff (lastEmittedSeq = -1). That's intentional: it doubles as the demo
- * "Reset & restart" button.
+ * startMatch flips the CLOCK item to isRunning=true and invokes sim-emitter.
+ * resetMatch stops the replay and returns the CLOCK to preMatch without starting.
  */
 
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
@@ -43,6 +37,30 @@ export const handler = async (
 ): Promise<StartMatchResult> => {
   const { matchId } = event.arguments.input;
   const now = Date.now();
+
+  if (event.info.fieldName === 'resetMatch') {
+    await ddb.send(
+      new PutItemCommand({
+        TableName: MATCHES_TABLE,
+        Item: {
+          PK: { S: `MATCH#${matchId}` },
+          SK: { S: 'CLOCK' },
+          matchId: { S: matchId },
+          isRunning: { BOOL: false },
+          startedAtWallMs: { N: '0' },
+          matchMinute: { N: '0' },
+          displayClock: { S: "0'" },
+          phase: { S: 'preMatch' },
+          scoreHome: { N: '0' },
+          scoreGuest: { N: '0' },
+          lastEmittedSeq: { N: '-1' },
+          updatedAt: { N: String(now) },
+        },
+      }),
+    );
+
+    return { matchId, startedAtWallMs: 0, isRunning: false };
+  }
 
   await ddb.send(
     new PutItemCommand({
