@@ -34,7 +34,8 @@ export function CoinBalance({ value }: CoinBalanceProps) {
   return (
     <div className="cbal" aria-label={`PitchCoin balance: ${value}`}>
       <span className="cbal__icon" aria-hidden="true">●</span>
-      <span className="cbal__num tabular">{formatter.format(value)}c</span>
+      <span className="cbal__num tabular">{formatter.format(value)}</span>
+      <span className="cbal__suffix">pts</span>
       {delta !== null && <span className="cbal__delta tabular">+{formatter.format(delta)}</span>}
     </div>
   );

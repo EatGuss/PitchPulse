@@ -26,12 +26,17 @@ const PUFF_TTL_MS = 2200;
 const MAX_PUFFS = 12;
 const LANE_COUNT = 5;
 
-export function ReactionStream() {
+export interface ReactionStreamProps {
+  hidden?: boolean;
+}
+
+export function ReactionStream({ hidden = false }: ReactionStreamProps) {
   const room = getWatchRoomEngine();
   const [puffs, setPuffs] = useState<Puff[]>([]);
   const laneCursor = useRef(0);
 
   useEffect(() => {
+    if (hidden) return;
     const off = room.bus.on('reaction', ({ reaction }) => {
       const lane = laneCursor.current++ % LANE_COUNT;
       setPuffs((cur) => {
@@ -48,7 +53,9 @@ export function ReactionStream() {
       off();
       offReset();
     };
-  }, [room]);
+  }, [room, hidden]);
+
+  if (hidden) return null;
 
   return (
     <div className="rxstream" aria-hidden="true">

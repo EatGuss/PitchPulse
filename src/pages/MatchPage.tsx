@@ -22,6 +22,7 @@ import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
 import { useUserBalance } from '../hooks/useUserBalance';
 import type { DemoUserId } from '../data/personas';
+import type { RankedOpponent } from '../domain/rankedTypes';
 import type { WatchRoomSession } from '../domain/watchRoomTypes';
 import './MatchPage.css';
 
@@ -32,6 +33,9 @@ export interface MatchPageProps {
   /** When set, enables Watch Room match UX (sidebar, live picks, room reactions). */
   watchRoom?: WatchRoomSession;
   onLeaveWatchRoom?: () => void;
+  /** When set, ranked mode — hidden picks, no reactions or comments. */
+  rankedOpponent?: RankedOpponent;
+  onLeaveRanked?: () => void;
 }
 
 export function MatchPage({
@@ -40,12 +44,15 @@ export function MatchPage({
   onSwitchUser,
   watchRoom,
   onLeaveWatchRoom,
+  rankedOpponent,
+  onLeaveRanked,
 }: MatchPageProps) {
   const { info, ready, error } = useMatchData();
   const { clock, events, paused } = useMatchSimState();
   const { prompt, vote, myPickedOptionId } = useActivePrompt(userId);
   const { balance } = useUserBalance(userId);
   const inWatchRoom = !!watchRoom;
+  const inRanked = !!rankedOpponent;
   const memberIds = watchRoom?.members.map((m) => m.userId);
 
   if (error) {
@@ -71,11 +78,11 @@ export function MatchPage({
     );
   }
 
-  const reactionsDisabled = clock.phase === 'preMatch';
+  const reactionsDisabled = clock.phase === 'preMatch' || inRanked;
 
   return (
     <div
-      className={`mpage ${inWatchRoom ? 'mpage--watch-room' : ''} ${hideSimControls ? 'mpage--hide-sim' : ''}`}
+      className={`mpage ${inWatchRoom ? 'mpage--watch-room' : ''} ${inRanked ? 'mpage--ranked' : ''} ${hideSimControls ? 'mpage--hide-sim' : ''}`}
     >
       <div className="mpage__body">
         <div className="mpage__main">
@@ -103,22 +110,41 @@ export function MatchPage({
                   <span className="mpage__switch-user-label">Room</span>
                 </button>
               )}
+              {inRanked && onLeaveRanked && (
+                <button
+                  type="button"
+                  className="mpage__switch-user"
+                  onClick={onLeaveRanked}
+                  aria-label="Leave ranked match"
+                >
+                  <span className="mpage__switch-user-icon" aria-hidden="true">←</span>
+                  <span className="mpage__switch-user-label">Ranked</span>
+                </button>
+              )}
               <ProfilePill userId={userId} />
             </div>
             <CoinBalance value={balance} />
           </div>
+          {inRanked && rankedOpponent && (
+            <div className="mpage__ranked-bar" aria-label="Ranked opponent">
+              <span className="mpage__ranked-label">vs</span>
+              <span className="mpage__ranked-opp">{rankedOpponent.opponentName}</span>
+            </div>
+          )}
           <MatchHeader info={info} clock={clock} />
           {!inWatchRoom && <Leaderboard viewerId={userId} />}
           <EventFeed events={events} info={info} viewerId={userId} />
           <div className="mpage__dock-wrap">
-            <div className="mpage__rx-anchor">
-              <ReactionBar
-                viewerId={userId}
-                disabled={reactionsDisabled}
-                roomId={watchRoom?.roomId}
-                memberIds={memberIds}
-              />
-            </div>
+            {!inRanked && (
+              <div className="mpage__rx-anchor">
+                <ReactionBar
+                  viewerId={userId}
+                  disabled={reactionsDisabled}
+                  roomId={watchRoom?.roomId}
+                  memberIds={memberIds}
+                />
+              </div>
+            )}
             <div className="mpage__dock">
               {!hideSimControls && <SimControls variant="inline" />}
               <BottomTabBar active="match" />
@@ -133,7 +159,7 @@ export function MatchPage({
           roomName={watchRoom.roomName}
         />
       )}
-      <ReactionStream />
+      <ReactionStream hidden={inRanked} />
       <PromptSheet
         prompt={prompt}
         myPickedOptionId={myPickedOptionId}
@@ -141,7 +167,7 @@ export function MatchPage({
         onVote={vote}
         pickRevealMode={inWatchRoom ? 'live' : 'both-voted'}
         roomMembers={watchRoom?.members}
-        roomId={watchRoom?.roomId}
+        roomId={inWatchRoom ? watchRoom?.roomId : undefined}
         matchPaused={paused}
       />
       <BadgeToast viewerId={userId} />

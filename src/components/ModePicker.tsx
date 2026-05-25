@@ -52,6 +52,13 @@ export function ModePicker({ userId, onSelectMode, onSwitchUser }: ModePickerPro
           icon="👥"
           onSelect={() => onSelectMode('watchRoom')}
         />
+        <ModeCard
+          title="Play Ranked"
+          description="Matchmake against a rival. Hidden picks, tier progression, no distractions."
+          icon="🏆"
+          variant="accent"
+          onSelect={() => onSelectMode('ranked')}
+        />
       </div>
     </div>
   );

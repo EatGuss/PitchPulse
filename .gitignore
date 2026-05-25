@@ -158,6 +158,12 @@ vite.config.ts.timestamp-*
 cdk.out/
 *.cdk.staging/
 
+# CDK TypeScript compile output (source lives in bin/*.ts, lib/*.ts)
+cdk/bin/*.js
+cdk/bin/*.d.ts
+cdk/lib/*.js
+cdk/lib/*.d.ts
+
 # AWS CDK deploy outputs — contains AppSync API key + Identity Pool ID.
 # Anything beyond endpoint URLs is sandbox-scoped and tied to temp creds, but
 # treat as secret. Re-generate via `cdk deploy --outputs-file cdk-outputs.json`.

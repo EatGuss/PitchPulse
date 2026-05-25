@@ -20,6 +20,11 @@
   font-size: 13px;
   letter-spacing: 0.01em;
 }
+.cbal__suffix {
+  font-size: 11px;
+  color: var(--pp-text-muted);
+  font-weight: 700;
+}
 .cbal__delta {
   position: absolute;
   top: -16px;

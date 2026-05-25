@@ -176,3 +176,14 @@ export const SUB_ROOM_LEADERBOARD = /* GraphQL */ `
     }
   }
 `;
+
+export const FIND_RANKED_MATCH = /* GraphQL */ `
+  mutation FindRankedMatch($userId: ID!) {
+    findRankedMatch(userId: $userId) {
+      opponentId
+      opponentName
+      opponentTier
+      opponentTitle
+    }
+  }
+`;

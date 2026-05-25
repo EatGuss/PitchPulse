@@ -117,6 +117,53 @@ type RoomLeaderboardUpdate @aws_iam {
   updatedAt: AWSTimestamp!
 }
 
+# ─── Ranked mode + Titles (tier progression, lifetime accuracy) ──────────────
+
+enum Tier {
+  BRONZE
+  SILVER
+  GOLD
+  DIAMOND
+  CHAMPION
+}
+
+type Title @aws_iam {
+  id: ID!
+  name: String!
+  description: String!
+}
+
+type RankedOpponent @aws_iam {
+  opponentId: ID!
+  opponentName: String!
+  opponentTier: Tier!
+  opponentTitle: String
+}
+
+type RankedMatchResult @aws_iam {
+  matchId: ID!
+  winnerId: ID!
+  loserId: ID!
+  winnerTier: Tier!
+  winnerTierWins: Int!
+  promoted: Boolean!
+  newTier: Tier
+}
+
+type TierPromotedEvent @aws_iam {
+  userId: ID!
+  previousTier: Tier!
+  newTier: Tier!
+  ts: AWSTimestamp!
+}
+
+type TitleUnlockedEvent @aws_iam {
+  userId: ID!
+  titleId: ID!
+  titleName: String!
+  ts: AWSTimestamp!
+}
+
 # ─── Inputs ──────────────────────────────────────────────────────────────────
 
 input MatchClockInput {
@@ -234,6 +281,15 @@ type Mutation @aws_iam {
 
   # Watch Room — server-only broadcast (Gate E wiring)
   publishRoomLeaderboard(input: RoomLeaderboardUpdateInput!): RoomLeaderboardUpdate
+
+  # Ranked + Titles — client-callable
+  findRankedMatch(userId: ID!): RankedOpponent
+  equipTitle(userId: ID!, titleId: String!): Boolean
+
+  # Ranked + Titles — server-only broadcast
+  completeRankedMatch(matchId: ID!, winnerId: ID!, loserId: ID!): RankedMatchResult
+  notifyTierPromoted(userId: ID!, previousTier: Tier!, newTier: Tier!, ts: AWSTimestamp!): TierPromotedEvent
+  notifyTitleUnlocked(userId: ID!, titleId: ID!, titleName: String!, ts: AWSTimestamp!): TitleUnlockedEvent
 }
 
 # ─── Subscriptions ───────────────────────────────────────────────────────────
@@ -259,4 +315,10 @@ type Subscription @aws_iam {
 
   roomLeaderboardUpdate(roomId: ID!): RoomLeaderboardUpdate
     @aws_subscribe(mutations: ["publishRoomLeaderboard"])
+
+  tierPromoted(userId: ID!): TierPromotedEvent
+    @aws_subscribe(mutations: ["notifyTierPromoted"])
+
+  titleUnlocked(userId: ID!): TitleUnlockedEvent
+    @aws_subscribe(mutations: ["notifyTitleUnlocked"])
 }

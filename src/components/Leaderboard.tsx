@@ -58,7 +58,7 @@ export function Leaderboard({ viewerId }: LeaderboardProps) {
               <span className="lb__coins tabular" aria-label={`${r.coinBalance} PitchCoins`}>
                 <span className="lb__coins-icon" aria-hidden="true">●</span>
                 {formatter.format(r.coinBalance)}
-                <span className="lb__coins-suffix">c</span>
+                <span className="lb__coins-suffix">pts</span>
               </span>
             </li>
           );

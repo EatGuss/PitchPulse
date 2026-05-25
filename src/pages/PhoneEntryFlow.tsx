@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { OnboardingScreen } from '../components/OnboardingScreen';
 import { ModePicker } from '../components/ModePicker';
 import { WatchRoomFlow } from '../components/WatchRoomFlow';
+import { RankedFlow } from '../components/RankedFlow';
 import { MatchPage } from './MatchPage';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import { isPlayMode, type PlayMode } from '../domain/playMode';
@@ -123,6 +124,16 @@ export function PhoneEntryFlow({
   if (mode === 'watchRoom') {
     return (
       <WatchRoomFlow
+        userId={userId}
+        hideSimControls={hideSimControls}
+        onBack={handleBackToModePicker}
+      />
+    );
+  }
+
+  if (mode === 'ranked') {
+    return (
+      <RankedFlow
         userId={userId}
         hideSimControls={hideSimControls}
         onBack={handleBackToModePicker}

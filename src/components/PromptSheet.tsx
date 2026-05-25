@@ -369,7 +369,7 @@ export function PromptSheet({
             {myPickedOptionId === null
               ? 'You sat this one out.'
               : myWon
-                ? `Nice call. Coins on the way. ${myPayout > 0 ? `+${myPayout}c` : ''}`
+                ? `Nice call. Points on the way. ${myPayout > 0 ? `+${myPayout} pts` : ''}`
                 : 'Better luck on the next one.'}
           </p>
         )}
