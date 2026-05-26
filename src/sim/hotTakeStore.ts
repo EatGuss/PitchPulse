@@ -56,6 +56,15 @@ export function consumeHotTake(matchId: string, userId: string): boolean {
   return true;
 }
 
+/** Restore one hot take when toggling off before the prompt locks. */
+export function refundHotTake(matchId: string, userId: string): void {
+  const row = byMatchUser.get(key(matchId, userId));
+  if (!row) return;
+  if (row.remaining >= HOT_TAKES_PER_RANKED_MATCH) return;
+  row.remaining += 1;
+  bus.emit('changed', undefined);
+}
+
 export function subscribeHotTakeChanged(onChange: () => void): () => void {
   return bus.on('changed', onChange);
 }

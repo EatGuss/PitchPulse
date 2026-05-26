@@ -98,7 +98,7 @@ export function subscribeRivalHotTake(
   onSignal: (signal: HotTakeSignal) => void,
 ): () => void {
   const offLocal = subscribeHotTakeSignaled((signal) => {
-    if (signal.rivalUserId === rivalUserId) onSignal(signal);
+    if (signal.userId === rivalUserId) onSignal(signal);
   });
 
   if (!isAwsMode) return offLocal;

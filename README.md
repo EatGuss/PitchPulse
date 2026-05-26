@@ -2,20 +2,20 @@
 
 Real-time social Bundesliga matchday companion — submission for the **DFL × Adidas × Slalom** *Fan Squad* hackathon, Challenge 3 ("A Real-Time Social Match Experience").
 
-Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchCoin economy, a leaderboard, and badges — all reacting to a replayed Bundesliga match in real time.
+Two fans, one matchday. Live event ticker, predict-the-next-moment prompts, PitchPoints, weekly/seasonal standings, collectible titles, and badges — all reacting to a replayed Bundesliga match in real time.
 
-> **Status:** MVP complete through Gate 5 (polish & submission). **Watch Room mode** shipped on `feature/watch-room` (Gates A–G). See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
+> **Status:** MVP complete through **Gate J** (Hot Take UI). Four-tab app shell, ranked 1v1, Watch Rooms, Standings, and Me profile are shipped on `feature/remove-publicmatch-and-livesheet`. See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
 
 ---
 
 ## Table of contents
 
 - [The three pillars](#the-three-pillars)
+- [App overview](#app-overview)
 - [Data & licensing disclosure](#data--licensing-disclosure)
-- [Architecture (Gate 4)](#architecture-gate-4)
+- [Architecture](#architecture)
 - [How to run locally](#how-to-run-locally)
 - [How to deploy to AWS](#how-to-deploy-to-aws)
-- [Watch Room mode](#watch-room-mode)
 - [How to demo this](#how-to-demo-this)
 - [Build status (gates)](#build-status-gates)
 - [Project decisions worth knowing](#project-decisions-worth-knowing)
@@ -27,9 +27,41 @@ Two fans, one room. Live event ticker, predict-the-next-moment prompts, a PitchC
 
 ## The three pillars
 
-1. **Multiplayer** — two demo users (Alice, Bob) share a matchday session. **Ranked** mode is head-to-head competition; **Watch Room** mode is private rooms by invite code with live picks, reactions, and comments. Passive spectating uses the Home **Live Feed** (no participation, no points).
-2. **Real-time data** — a replay emitter reads the anonymized DFL match XML and ticks events out on an accelerated clock (1 match-minute ≈ 2 real seconds). Goal, card, **and** half-time events drive UI changes — plus offside, corner, foul, shot-saved/blocked/missed for richness.
-3. **Gamification** — PitchCoin economy, live leaderboard, collectible badges, streak chip. Correct predictions earn `base_reward × min(1 / your_vote_share, 5.0)` coins. Wrong predictions cost zero — **never negative, never real money**.
+1. **Multiplayer** — two demo users (Alice, Bob) share a matchday session. **Ranked** is head-to-head 1v1 with hidden picks and fixed scoring. **Watch Room** is private invite-code rooms with live picks, reactions, and comments. Passive spectating uses the Home **Live Feed** (no participation, no points).
+2. **Real-time data** — a replay emitter reads the anonymized DFL match XML and ticks events out on an accelerated clock (1 match-minute ≈ 2 real seconds). Goal, card, half-time, and secondary events (offside, corner, foul, shots) drive UI changes.
+3. **Gamification** — PitchPoints economy, live match leaderboard, weekly/seasonal standings, collectible badges, unlockable titles, and tier progression. Watch Room rewards minority correct picks with `base × min(1 / your_vote_share, 5.0)`. Ranked uses fixed points per correct pick; **Hot Takes** (2 per match) pay **2.5×** when correct. Wrong predictions always earn zero — **never negative, never real money**.
+
+---
+
+## App overview
+
+After onboarding, the app opens on four tabs:
+
+| Tab | What it does |
+|---|---|
+| **Home** | Matchday hero card, lock-in for ranked fixtures, upcoming/live/FT schedule, active Watch Rooms, Live Feed sheet |
+| **Compete** | Toggle **Ranked** vs **Live & Watch Rooms** — matchmaking, invite-code rooms, in-match play |
+| **Standings** | Weekly and seasonal leaderboards (local seeds + AWS sync) |
+| **Me** | Profile, tier bar, stats, titles grid, match history, settings |
+
+**Ranked flow:** lock a fixture on Home before kickoff → Compete → Play Ranked → matchmaking → live 1v1 match → post-match summary.
+
+**Titles (8 collectible badges)** — thresholds in `src/domain/titleRules.ts` (`npm run verify:titles`):
+
+| Category | Title | Threshold |
+|---|---|---|
+| Accuracy (lifetime, all ranked) | Sharpshooter | 70%+ accuracy, min 30 shots |
+| | Sniper | 80%+ accuracy, min 50 shots |
+| | Oracle | 90%+ accuracy, min 100 shots |
+| Volume (lifetime ranked matches) | Analyst | 100+ matches |
+| | Veteran | 500+ matches |
+| Style (single match, kept forever) | Hot Take Hero | Won ≥1 hot take in ranked |
+| | Comeback King | Won after trailing 200+ pts at HT |
+| | Perfect Match | 100% accuracy in one match, min 6 shots |
+
+**Me → Titles** shows progress on locked cards; equip updates matchmaking reveal. Local `/demo` evaluates on each resolved prompt + full-time; AWS sends match stats with `completeRankedMatch` and `titleUnlocked` subscriptions.
+
+**Watch Room flow:** Compete → Watch Room → create or join by code → lobby → Start Match → shared in-room UX.
 
 ---
 
@@ -48,13 +80,13 @@ The match is internally identified as **`DFL-MAT-000001`**, with anonymized team
 
 For narrative cohesion we **display these teams as "FC Bayern" (FCB) and "Borussia Dortmund" (BVB)** with subtle team-color accents. **No real-world club crests, kits, logos, or player photos are used anywhere in the app.** Player numbers shown in the UI come straight from the XML; player names rendered are the anonymized placeholders from the source data.
 
-A persistent disclosure line is rendered on both `/demo` and `/` pages (and on the onboarding screen) so this is visible during any screen recording.
+A persistent disclosure line is rendered on `/demo`, `/`, and the onboarding screen so this is visible during any screen recording.
 
-**The hackathon XML is never committed to this repository.** The `.gitignore` blocks `/data/`, `.env.local`, `/cdk.out/` and the CDK outputs file. Per challenge brief §10, the data stays in the existing `hackathon-data-058755927272` S3 bucket; the deployed `sim-emitter` Lambda reads it via an IAM-scoped `s3:GetObject`.
+**The hackathon XML is never committed to this repository.** The `.gitignore` blocks `/data/`, `.env.local`, `/cdk.out/`, and CDK output artifacts. Per challenge brief §10, the data stays in the existing `hackathon-data-058755927272` S3 bucket; the deployed `sim-emitter` Lambda reads it via an IAM-scoped `s3:GetObject`.
 
 ---
 
-## Architecture (Gate 4)
+## Architecture
 
 ```
                 ┌──────────────────────────────┐
@@ -80,14 +112,16 @@ A persistent disclosure line is rendered on both `/demo` and `/` pages (and on t
                                   └──────────────────────┘             │
                                                                        ▼
                               ┌──────────────────────────────────────────────┐
-                              │ AppSync GraphQL (IAM auth, JS resolvers)     │
-                              │   • publishMatchClock  ── @aws_subscribe ──▶ │
-                              │   • publishMatchEvent  ── @aws_subscribe ──▶ │
-                              │   • fireReaction        (DDB pp-rooms)       │
+                              │ AppSync GraphQL (IAM auth)                   │
+                              │   • publishMatchClock / publishMatchEvent    │
+                              │   • startMatch / resetMatch                  │
+                              │   • submitVote / signalHotTake (vote-handler)│
                               │   • createRoom / joinRoom / postComment      │
-                              │     leaveRoom           (pp-room-handler λ)  │
-                              │   • submitVote          (DDB pp-prompts)     │
-                              │   • startMatch          (Lambda)             │
+                              │     leaveRoom / fireReaction                 │
+                              │   • findRankedMatch / lockInRankedMatch      │
+                              │     completeRankedMatch / unlockHotTakeHero  │
+                              │   • weeklyLeaderboard / seasonalLeaderboard  │
+                              │     userStats / rankedMatchdayStatus         │
                               └──────────────────────┬───────────────────────┘
                                                      │  WebSocket subs
                                                      ▼
@@ -102,14 +136,15 @@ A persistent disclosure line is rendered on both `/demo` and `/` pages (and on t
 
 | Table | PK | SK | Notes |
 |---|---|---|---|
-| `pp-users` | `USER#<id>` | `PROFILE` / `STREAK` / `BADGE#<id>` / `COIN_LEDGER#<ts>` | No Streams |
+| `pp-users` | `USER#<id>` | `PROFILE` / `STREAK` / `BADGE#<id>` / `COIN_LEDGER#<ts>` | Profiles, tiers, titles, leaderboard points |
 | `pp-matches` | `MATCH#<id>` | `CLOCK` / `EVENT#<seq>` | Streams `NEW_AND_OLD_IMAGES` |
-| `pp-prompts` | `PROMPT#<id>` | `META` / `VOTE#<user>` / `RESOLUTION` | TTL on `expiresAt` (24h) |
+| `pp-prompts` | `PROMPT#<id>` | `META` / `VOTE#<user>` / `HOT_TAKE_STATE#<user>` | Votes + hot take allowance; TTL on `expiresAt` (24h) |
 | `pp-rooms` | `ROOM#<room_id>` | `META` / `MEMBER#<user>` / `REACTION#<ts>` / `COMMENT#<ts>` | `InviteCodeIndex` GSI; TTL on `expiresAt` (24h) |
+| `pp-leaderboards` | period key | `USER#<id>` | Weekly / seasonal standings |
 
 **Auth:** Cognito Identity Pool, anonymous guest role. Two pre-created demo IDs (`alice`, `bob`) — no signup, no email, no PII.
 
-**Region:** `eu-central-1` (Frankfurt). Every AWS SDK client / CDK env / CLI command is pinned to this region — no `us-east-1` defaults anywhere.
+**Region:** `eu-central-1` (Frankfurt). Every AWS SDK client, CDK env, and CLI command is pinned to this region.
 
 ---
 
@@ -144,6 +179,13 @@ cp .env.example .env.local
 
 The ISB sandbox portal generates a profile name like `058755927272_slalom_IsbUsersPS`. That exact name goes in `AWS_PROFILE_NAME`. When credentials expire (~1 hour TTL), refresh the credential block in `~/.aws/credentials` from the portal — only that block changes.
 
+For a tight demo recording, also set in `.env.local`:
+
+```bash
+VITE_SIM_SECONDS_PER_MATCH_MINUTE=2
+VITE_PROMPT_WINDOW_MS=5000
+```
+
 ### 3. Run
 
 ```bash
@@ -152,68 +194,37 @@ npm run dev      # runs `npm run parse` first, then starts Vite at 127.0.0.1:517
 
 Then open:
 
-- **`http://127.0.0.1:5173/demo`** — the two-phone side-by-side stage used for the demo recording.
-- `http://127.0.0.1:5173/` — single-phone view. You'll see the onboarding screen first; tap **Continue as Alice** (or Bob). Add `?as=bob` to deep-link past onboarding, `?frame=off` for raw mobile preview at 390px.
+### Which URL to use
 
-After onboarding, the app opens on **Home** with four tabs (Home, Compete, Standings, Me). On `/demo`, complete onboarding on both phones, then follow the [Watch Room demo flow](#watch-room-mode) or use **Compete → Play Ranked** for head-to-head play.
+| Route | Use for |
+|---|---|
+| **`http://127.0.0.1:5173/demo`** | **Default for presenting and recording.** Two phone frames (Alice + Bob) side by side, shared match sim, center **MATCH SIM** controls. |
+| **`http://127.0.0.1:5173/`** | Dev preview of **one** fan only. **Not** the hackathon demo layout — you cannot run Ranked 1v1 or Watch Room multiplayer on a single frame without opening a second browser/tab. |
+
+**`/demo` ships with pre-populated local seed data** (no DynamoDB setup required in local-only mode): Alice at **Silver 4/5** toward Gold, Bob at **Gold 4/8** toward Diamond, equipped titles, match history on **Me**, and standings seeds. Use **⌫ Demo state** in the center sim bar to reset tiers, matchday lock-in, and rooms without restarting the clock.
+
+The **single-phone** route (`/`) uses the same seeded profile store when you pick Alice or Bob, but only one persona is visible at a time and there is no shared sim bridge between two frames — use it for UI spot-checks (`?as=bob`, `?frame=off`), not for the recorded demo.
+
+After onboarding, both routes land on **Home** with the four-tab nav.
 
 ### Run modes (AWS vs local)
 
 The frontend auto-detects whether AWS variables are set in `.env.local`:
 
-- **Local-only mode** (no `VITE_APPSYNC_URL`): the React MatchSim runs the timeline in-browser. Both phones share an in-memory pub/sub. No AWS calls.
-- **AWS mode** (CDK outputs filled in): the React frontend uses Amplify to subscribe to AppSync. **▶ Kick off** invokes the `startMatch` mutation; the live sim runs in Lambda + DynamoDB Streams. Both phones receive the same WebSocket fan-out.
+| Mode | Trigger | Behaviour |
+|---|---|---|
+| **Local-only** | `VITE_APPSYNC_URL` empty | MatchSim runs in-browser; both `/demo` phones share in-memory pub/sub. Watch Rooms sync via `localRoomStore`. |
+| **AWS** | CDK outputs filled in | Amplify subscribes to AppSync. **▶ Kick off** calls `startMatch`; sim runs in Lambda + DynamoDB Streams. Both phones get the same WebSocket fan-out. |
 
 The challenge brief explicitly allows "a local running app with API calls to AWS" — both modes are valid demo paths.
 
-Without AWS env vars, Watch Room create/join/comment/reaction sync still works on `/demo` via an in-memory `localRoomStore` so both phone frames share the same tab-local room state.
-
----
-
-## Watch Room mode
-
-Private invite-code rooms for friends watching the same replay together.
-
-### Flow
-
-```
-Onboarding → Home (or Compete tab)
-  → Watch Room → Create Room  → lobby (host sees invite code)
-              → Enter Code   → join as guest
-              → Start Match  → both phones enter MatchPage with room context
-  → Ranked     → matchmaking → live ranked match
-```
-
-### In-room features
-
-| Feature | Watch Room | Ranked |
-|---|---|---|
-| Pick reveal | **Live** — “Bob picked Home” as soon as they tap | Hidden until **both** users vote |
-| Leaderboard | **Room sidebar** with member balances | Global strip (match-local points) |
-| Reactions | Room-scoped; deduped per screen | Hidden |
-| Comments | **140-char plain-text threads** on each prompt | Hidden |
-| Pause | Center **❚❚ Pause** freezes clock and prompts | Same |
-
-### Invite codes
-
-- Format: `XXX-XXX` (e.g. `PLZ-482`). Tap the code card in the lobby to copy.
-- Backend: `createRoom` / `joinRoom` mutations on AppSync → `pp-room-handler` Lambda → `pp-rooms` DynamoDB.
-- Local fallback: `src/sim/localRoomStore.ts` when `VITE_APPSYNC_URL` is unset.
-
-### Key files
-
-| Area | Paths |
-|---|---|
-| Entry + lobby | `WatchRoomFlow`, `WatchRoomEntry`, `WatchRoomLobby` |
-| In-room UI | `RoomMemberSidebar`, `LivePickReveal`, `PromptCommentThread` |
-| AWS client | `src/aws/roomClient.ts` |
-| Cross-phone demo sync | `src/sim/watchRoomCoordination.ts`, `localRoomStore.ts` |
+**Dev reset:** in local dev, **⌫ Demo state** in the sim control bar clears ranked matchday, standings seeds, profile, hot take allowance, and local rooms without restarting the match clock.
 
 ---
 
 ## How to deploy to AWS
 
-**Prereqs:** all the local prereqs, plus CDK bootstrapped once per account/region.
+**Prereqs:** all local prereqs, plus CDK bootstrapped once per account/region.
 
 ```bash
 # Bootstrap once (one-time per account/region):
@@ -232,16 +243,15 @@ npx cdk deploy --require-approval never \
   --outputs-file cdk-outputs.json
 ```
 
-`cdk-outputs.json` contains the AppSync URL and Cognito Identity Pool ID. Copy them into the repo-root `.env.local`:
+Copy outputs into the repo-root `.env.local`:
 
 ```bash
-# .env.local at project root (NOT inside cdk/)
 VITE_APPSYNC_URL=https://<id>.appsync-api.eu-central-1.amazonaws.com/graphql
 VITE_APPSYNC_REGION=eu-central-1
 VITE_COGNITO_IDENTITY_POOL_ID=eu-central-1:<uuid>
 ```
 
-Restart `npm run dev` and you're connected to AWS. The header in the browser DevTools console will log:
+Restart `npm run dev`. A healthy AWS session logs:
 
 ```
 [amplify] configured for AppSync @ https://...
@@ -255,7 +265,7 @@ Restart `npm run dev` and you're connected to AWS. The header in the browser Dev
 npx cdk deploy --hotswap --profile <YOUR_ISB_PROFILE>
 ```
 
-`--hotswap` patches Lambda code in seconds, **skipping CloudFormation**. Use a full deploy (no `--hotswap`) when changing IAM, schema, Lambda concurrency, or any other CFN-level property.
+Use a full deploy (no `--hotswap`) when changing IAM, GraphQL schema, or CloudFormation-level properties.
 
 ### Tearing down
 
@@ -264,56 +274,65 @@ cd cdk
 npx cdk destroy --force --profile <YOUR_ISB_PROFILE>
 ```
 
-The hackathon S3 bucket is external — the stack only attaches a read-only policy and does not create/delete it. DynamoDB tables and CloudWatch log groups are removed with the stack (`RemovalPolicy.DESTROY` for the sandbox).
-
-### Frontend hosting (deferred)
-
-S3 + CloudFront frontend hosting is **deferred** per the brief ("a local running app with API calls to AWS" scores fine). The CDK stack is structured to drop in an `aws-s3-deployment` + `cloudfront.Distribution` block; see `cdk/lib/pitchpulse-stack.ts` comments.
+The hackathon S3 bucket is external — the stack only attaches a read-only policy. DynamoDB tables and log groups are removed with the stack (`RemovalPolicy.DESTROY` for the sandbox).
 
 ---
 
 ## How to demo this
 
-Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). The short version (Watch Room cut):
+**Always use `/demo`, not `/`.** The two-phone stage is required for Watch Room and Ranked flows (two fans, one shared match clock). Seed data is already loaded in the browser — refresh or **⌫ Demo state** only if you need a clean ranked promotion run (Alice **Silver → Gold** on one win).
 
-1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames visible top-to-bottom.
-2. Complete onboarding on both phones → **Home** tab.
-3. **Bob** → **Compete** → **Watch Room** → **Create Room** → note the invite code (e.g. `PLZ-482`).
-4. **Alice** → **Compete** → **Watch Room** → **Enter Code** → joins Bob’s lobby. Bob taps **Start Match**.
-5. Click **▶ Kick off** on the center control bar. Both phones tick together.
-6. **Pillar 2:** same event card on both phones within ~200 ms.
-7. **Pillar 1:** prompt fires → Alice votes → Bob sees live pick reveal → Bob votes differently → expand **Comments**, post a 140-char line on both phones.
-8. **Pillar 3:** resolution → coin animation → room sidebar reorders by balance.
-9. **Reactions:** 🔥 from Alice puffs on Bob’s screen.
-10. **Full-time:** room sidebar shows final standings. Stop at ≤ 3:00; add overlays from the demo script; export `presentation_video.mp4`.
+Full shot-by-shot script: [`docs/demo-script.md`](./docs/demo-script.md).
 
-### Locked-in recording rules
+### Watch Room cut (~3 min)
 
-- **No voice-over.** The video uses **text overlays + on-screen names only**. The UI carries the narrative through visible labels.
-- **Record at 1920×1080** with `/demo` open in the browser. Both phone frames must remain visible the entire time.
-- **Phone-frame chrome stays on** for the demo. `?frame=off` is for testing the raw mobile layout — never for the recording.
-- **`VITE_PROMPT_WINDOW_MS=5000`** in `.env.local` keeps the demo cadence tight (~3 prompts in a 3-minute match playback). Spec default is `30000`.
+1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames visible.
+2. Complete onboarding on both phones → **Home**.
+3. **Bob** → **Compete** → **Watch Room** → **Create Room** → note invite code (e.g. `PLZ-482`).
+4. **Alice** → **Compete** → **Watch Room** → **Enter Code** → joins lobby. Bob taps **Start Match**.
+5. Click **▶ Kick off**. Both phones tick together; same event card within ~200 ms.
+6. Prompt fires → Alice votes → Bob sees live pick reveal → Bob votes → **Comments** thread on the prompt.
+7. Resolution → PitchPoints animation → room sidebar reorders. 🔥 reaction from Alice puffs on Bob's screen.
+8. Full-time → final room standings.
+
+### Ranked + Hot Take cut (optional B-roll)
+
+1. **Home** → lock in a live fixture before kickoff.
+2. **Compete** → **Ranked** → matchmaking → live 1v1.
+3. On a prompt, toggle **Hot Take** → vote. Rival sees the hot take signal; correct hot takes pay **2.5×** and can unlock the **Hot Take Hero** title.
+4. Full-time → post-match summary → **Standings** / **Me** tabs for leaderboard and tier progress.
+
+### Recording rules
+
+- **No voice-over.** Text overlays + on-screen labels only.
+- **Record at 1920×1080** with **`/demo` open** — not the single-phone `/` route. Both phone frames visible the entire time.
+- **Phone-frame chrome stays on** for the recording. `?frame=off` on `/` is for layout testing only.
+- **`VITE_PROMPT_WINDOW_MS=5000`** keeps demo cadence tight (~3 prompts in a 3-minute playback). Spec default is `30000`.
 
 ---
 
 ## Build status (gates)
 
+**Core MVP**
+
 - [x] **Gate 0** — Discover S3 bucket, normalize XML, lock in `.gitignore`
 - [x] **Gate 1** — Local foundation: phone-frame UI, dark theme, in-memory pub/sub, `/demo` route
-- [x] **Gate 2** — Matchday Shots (live multiplayer prompts, 30s window, odds-based rewards, ≤ 8 per match)
+- [x] **Gate 2** — Matchday Shots (live prompts, 30s window, odds-based rewards, ≤ 8 per match)
 - [x] **Gate 3** — Watch room reactions, leaderboard, badges, streak chip
 - [x] **Gate 4** — AWS deploy: AppSync + Lambda + DynamoDB + EventBridge + Cognito via CDK
-- [x] **Gate 5** — Onboarding, tooltip polish, README, demo script, executive summary, jumbotron concept
+- [x] **Gate 5** — Onboarding, tooltip polish, README, demo script, executive summary
 
-**Watch Room feature (`feature/watch-room`):**
+**Four-tab restructure + ranked progression**
 
-- [x] **Gate A** — Bootstrap check (git, AWS stack, dev server)
-- [x] **Gate B** — Mode Picker (Watch Room entry; superseded by 4-tab nav)
-- [x] **Gate C** — `pp-rooms` extensions + AppSync schema + `pp-room-handler` Lambda
-- [x] **Gate D** — Create/join flow + lobby
-- [x] **Gate E** — In-room match UX (sidebar, live picks, reactions)
-- [x] **Gate F** — Comment threads on prompts
-- [x] **Gate G** — Polish, README/demo-script update, final deploy, verify
+- [x] **Gate A–D** — App shell, Home tab, matchday lock-in, post-match hero states
+- [x] **Gate E** — Compete tab (Ranked vs Live & Watch Rooms), ranked matchday backend
+- [x] **Gate F** — Standings tab (weekly / seasonal)
+- [x] **Gate G** — Me tab (profile, stats, tier bar, titles, match history)
+- [x] **Gate H** — Restructure checkpoint
+- [x] **Gate I** — Hot Take backend (`vote-handler`, `signalHotTake`, title unlock)
+- [x] **Gate J** — Hot Take UI (toggle, rival indicator, resolution copy)
+- [x] **Ranked branch Gate E** — Titles rules, progress copy, unlock toasts, server `completeRankedMatch` stats (see Titles above)
+- [ ] **Gate K** / **Ranked branch Gate F** — Demo video, executive PDF, submission zip (in progress — see below)
 
 ---
 
@@ -324,24 +343,23 @@ Detailed shot-by-shot script in [`docs/demo-script.md`](./docs/demo-script.md). 
 | ADR-001 | Prompts fire on the **server-side match clock**, not viewer stream time. 30s answer window enforced server-side. |
 | ADR-010 | AppSync (not custom WebSockets) for subscriptions, schema, and auth. |
 | ADR-012 | Match data is replayed from the **provided anonymized XML**. No live feeds, no third-party sports APIs. |
-| Reward | `reward = base × min(1 / your_vote_share, 5.0)`. Wrong = 0. Never negative, never real money. |
-| Personas | Alice = "Markus" archetype (Casual fan) × FCB. Bob = "Nina" archetype (Moment-led fan) × BVB. Cosmetic only — no gameplay advantage. |
-| Anti-licensing | Text-only team labels; no club crests, kits, logos, or player photos in the deployed demo. |
-| Anti-gambling | "Coins" and "odds" framing only. No purchases, sweepstakes, or wager language anywhere. |
+| Watch Room reward | `reward = base × min(1 / your_vote_share, 5.0)`. Wrong = 0. |
+| Ranked reward | Fixed `baseReward` per correct pick — no odds multiplier in 1v1. |
+| Hot Take | 2 per ranked match; correct hot take pays **2.5×**; unlocks **Hot Take Hero** title. |
+| Personas | Alice = "Markus" archetype (Casual fan) × FCB. Bob = "Nina" archetype (Moment-led fan) × BVB. Cosmetic only. |
+| Anti-licensing | Text-only team labels; no club crests, kits, logos, or player photos. |
+| Anti-gambling | "Points" and "odds" framing only. No purchases, sweepstakes, or wager language. |
 
 ---
 
 ## What's next (deferred)
 
-These are explicitly out-of-scope for the MVP but designed for:
-
-- **Squad management, packs, trading, wages** — the full "Spielmacher" loop from PITCHPULSE.md §6.4–6.6.
+- **Squad management, packs, trading, wages** — full "Spielmacher" loop from PITCHPULSE.md §6.4–6.6.
 - **Cross-device Watch Rooms** — `/demo` syncs two phones in one tab; true multi-browser rooms need shared AWS subscriptions (backend already supports this).
-- **Stadium jumbotron mode** — see [`docs/jumbotron-concept.png`](./docs/jumbotron-concept.png). PitchPulse leaderboard rendered as a between-possessions tile on the in-stadium screen.
-- **React Native / Expo migration** — the phone-frame web app was built to be lift-and-shift to RN once the design is locked. CSS tokens map 1:1 to React Native style objects; no DOM-only APIs in the engines.
-- **Step Functions, SQS FIFO, WAF, X-Ray, SES/SNS push** — listed in the brief but not on the MVP critical path.
-- **S3 + CloudFront frontend hosting** — the CDK stack has a slot for it; `aws-s3-deployment.BucketDeployment` + `aws-cloudfront.Distribution` plugs in cleanly.
-- **Late-joiner UX** — refreshing mid-match bootstraps the score correctly but not the EventFeed back-fill. A `recentEvents` AppSync query on mount would close this.
+- **Stadium jumbotron mode** — see [`docs/jumbotron-concept.png`](./docs/jumbotron-concept.png).
+- **React Native / Expo migration** — phone-frame web app designed for lift-and-shift once design is locked.
+- **S3 + CloudFront frontend hosting** — CDK stack has a slot; brief allows local app + AWS API calls.
+- **Late-joiner UX** — score bootstraps on refresh but EventFeed does not back-fill; a `recentEvents` query on mount would close this.
 
 ---
 
@@ -354,7 +372,7 @@ PitchPulse.zip
 ├── github_link.txt          # link to this repo
 ├── presentation_video.mp4   # ≤ 3 min, 1920×1080
 ├── executive_summary.pdf    # 5 slides (export from docs/executive-summary.md)
-└── prfaq.pdf                # optional, not in the MVP scope
+└── prfaq.pdf                # optional
 ```
 
 Files in this repo that feed the submission:
@@ -368,8 +386,34 @@ If the repo is private, invite GitHub user `MoellerO` per the brief.
 
 ---
 
+## Gate K — submission packaging (in progress)
+
+Code and docs for the final handoff:
+
+| Item | Status |
+|---|---|
+| `/demo` vs `/` documented + banner on single-phone route | Done |
+| [`docs/demo-script.md`](./docs/demo-script.md) — Watch Room cut + ranked B-roll appendix | Done |
+| [`docs/executive-summary.md`](./docs/executive-summary.md) — 5-slide PDF source | Done (export PDF locally) |
+| [`submission/github_link.txt`](./submission/github_link.txt) | Done |
+| `presentation_video.mp4` | **You record** — follow demo script at 1920×1080 |
+| `executive_summary.pdf` | **You export** — from executive-summary.md |
+| Pre-zip validation | `npm run verify:submission` |
+
+```bash
+# After placing video + PDF in submission/:
+npm run verify:submission
+
+cd submission
+Compress-Archive -Path github_link.txt, presentation_video.mp4, executive_summary.pdf -DestinationPath PitchPulse.zip -Force
+```
+
+See [`submission/README.md`](./submission/README.md) for the full checklist.
+
+---
+
 ## License & repo
 
 Code in this repository is for the hackathon submission only. The replayed match data is **not** in this repo (see disclosure above). Do not redistribute the hackathon XML.
 
-No licensed Bundesliga marks (crests, kits, player photos) are used anywhere in source or build artifacts. Team labels are text-only and the spec calls out FC Bayern / Borussia Dortmund purely for narrative — replaceable via a one-line edit in `src/data/teamAliases.ts`.
+No licensed Bundesliga marks (crests, kits, player photos) are used anywhere in source or build artifacts. Team labels are text-only; FC Bayern / Borussia Dortmund naming is narrative-only and replaceable via `src/data/teamAliases.ts`.

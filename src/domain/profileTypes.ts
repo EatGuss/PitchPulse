@@ -22,6 +22,8 @@ export interface MeProfile {
   weeklyPoints: number;
   seasonalPoints: number;
   lifetimeAccuracy: number | null;
+  totalShots: number;
+  correctShots: number;
   rankedMatchesPlayed: number;
   matchHistory: MatchHistoryEntry[];
 }

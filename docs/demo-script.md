@@ -47,14 +47,14 @@ Full `/demo` screen. Complete onboarding on **both** phones (Alice left, Bob rig
 
 ### 0:15 — Bob creates a Watch Room (15 sec)
 
-On **Bob's phone**: tap **Watch Room** → **Create Room**. Lobby appears with auto-generated room name and invite code (e.g. `PLZ-482`). Tap the code card to show the copy toast.
+On **Bob's phone**: bottom nav **Compete** → sub-tab **Live & Watch Rooms** → **Create Room**. Lobby appears with auto-generated room name and invite code (e.g. `PLZ-482`). Tap the code card to show the copy toast.
 
 **Overlay copy:**
 > Private Watch Room · invite code in one tap
 
 ### 0:30 — Alice joins (15 sec)
 
-On **Alice's phone**: tap **Watch Room** → **Enter Code** → type Bob's code → **Join Room**. Both phones show the same lobby member list. Bob (host) taps **Start Match**.
+On **Alice's phone**: **Compete** → **Live & Watch Rooms** → **Enter Code** → type Bob's code → **Join Room**. Both phones show the same lobby member list. Bob (host) taps **Start Match**.
 
 **Overlay copy:**
 > Friends join by code · host starts the match
@@ -151,5 +151,28 @@ End at ≤ 3:00.
 - ❌ No keyboard shortcuts visible in frame.
 - ❌ Don't show DevTools, terminal, or `.env.local` in the recording.
 - ❌ Don't go past 3:00. Recut if needed.
+
+## Appendix — Ranked promotion B-roll (optional, ~45 sec)
+
+Use this as a **second recording** or trim into the main video if under 3:00. Requires **`/demo`** (not `/`). Reset with **⌫ Demo state** in the center bar first so Alice is **Silver 4/5**.
+
+| Step | Action |
+|---|---|
+| 1 | Both phones: **Home** → **Select your match** → lock primary fixture |
+| 2 | Center bar: **▶ Kick off** |
+| 3 | Both: **Home** → **Play Ranked** (or **Compete** → **Ranked** → play) |
+| 4 | Matchmaking → opponent reveal (tier + title) → ranked match; favor Alice's picks |
+| 5 | Full time → Alice: **Welcome to Gold** overlay → results with tier bar **5/8**; Bob: loss, still **4/8** Gold |
+
+**Overlay copy (pick 2–3):**
+> Ranked 1v1 · hidden picks until both vote
+>
+> Win-based tiers · no ELO · no demotion
+>
+> One ranked win — Silver → Gold
+
+Capture **Me** tab on Alice after continue to show equipped title + tier bar.
+
+---
 
 ## Narrative cheat (editor note)

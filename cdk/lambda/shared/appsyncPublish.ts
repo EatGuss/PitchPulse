@@ -88,3 +88,14 @@ export const NOTIFY_TITLE_UNLOCKED = /* GraphQL */ `
     }
   }
 `;
+
+export const NOTIFY_TIER_PROMOTED = /* GraphQL */ `
+  mutation NotifyTierPromoted($userId: ID!, $previousTier: Tier!, $newTier: Tier!, $ts: AWSTimestamp!) {
+    notifyTierPromoted(userId: $userId, previousTier: $previousTier, newTier: $newTier, ts: $ts) {
+      userId
+      previousTier
+      newTier
+      ts
+    }
+  }
+`;

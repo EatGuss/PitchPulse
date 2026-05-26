@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
-    "verify": "tsx scripts/verify-payouts.ts"
+    "verify": "tsx scripts/verify-payouts.ts",
+    "verify:titles": "tsx scripts/verify-title-rules.ts",
+    "verify:submission": "tsx scripts/verify-submission.ts"
   },
   "dependencies": {
     "aws-amplify": "^6.17.0",

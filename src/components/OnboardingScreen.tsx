@@ -21,9 +21,16 @@ import './OnboardingScreen.css';
 export interface OnboardingScreenProps {
   /** Called with the chosen demo user id. Parent should update the URL param. */
   onContinue: (userId: DemoUserId) => void;
+  /** When set, only these profiles are shown (e.g. /demo locked frames). */
+  allowedUserIds?: DemoUserId[];
+  personaConflict?: boolean;
 }
 
-export function OnboardingScreen({ onContinue }: OnboardingScreenProps) {
+export function OnboardingScreen({
+  onContinue,
+  allowedUserIds = ['alice', 'bob'],
+  personaConflict = false,
+}: OnboardingScreenProps) {
   const alice = DEMO_USERS.alice;
   const bob = DEMO_USERS.bob;
   const aliceTeam = teamAlias(alice.favoriteTeamId);
@@ -62,6 +69,13 @@ export function OnboardingScreen({ onContinue }: OnboardingScreenProps) {
       <div className="onb__choose">
         <p className="onb__choose-label">CONTINUE AS A DEMO FAN</p>
 
+        {personaConflict && (
+          <p className="onb__conflict" role="alert">
+            That profile is already in use on another phone. Pick the other fan.
+          </p>
+        )}
+
+        {allowedUserIds.includes('alice') && (
         <button
           type="button"
           className="onb__user onb__user--alice"
@@ -79,7 +93,9 @@ export function OnboardingScreen({ onContinue }: OnboardingScreenProps) {
           </span>
           <span className="onb__user-cta" aria-hidden="true">→</span>
         </button>
+        )}
 
+        {allowedUserIds.includes('bob') && (
         <button
           type="button"
           className="onb__user onb__user--bob"
@@ -97,6 +113,7 @@ export function OnboardingScreen({ onContinue }: OnboardingScreenProps) {
           </span>
           <span className="onb__user-cta" aria-hidden="true">→</span>
         </button>
+        )}
 
         <p className="onb__choose-foot">
           No signup, no email. Two anonymous demo profiles —

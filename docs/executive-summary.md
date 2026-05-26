@@ -94,11 +94,11 @@ hackathon-data S3                EventBridge (1-min cron)
 Four numbered panels in a 2×2 grid. Each panel: a small screenshot + a one-line caption.
 
 1. **Kick-off** — both phones light up with the same event card within 200 ms. → **Pillar 2: real-time data**
-2. **Watch Room join** — Bob creates `PLZ-XXX`, Alice enters code, host starts match. → **Pillar 1: multiplayer**
+2. **Watch Room join** — **Compete** → Live & Watch Rooms; Bob creates `PLZ-XXX`, Alice joins by code. → **Pillar 1: multiplayer**
 3. **Live pick + comment** — Alice votes, Bob sees the pick instantly; both post in the prompt thread. → **Pillar 1 again**
-4. **Resolution + room sidebar** — winning option green; `+12c` floats up; room leaderboard reorders. → **Pillar 3: gamification**
+4. **Resolution + gamification** — winning option green; PitchPoints chip; room sidebar **or** ranked post-match tier bar / **Silver → Gold** promotion overlay. → **Pillar 3: gamification**
 
-**Footer line:** Demo video records this exact flow on the `/demo` route at 1920×1080. Total runtime ≤ 3:00.
+**Footer line:** Primary demo video uses **`/demo`** (two phones), not `/`. Total runtime ≤ 3:00. Ranked promotion B-roll: see `docs/demo-script.md` appendix.
 
 ---
 

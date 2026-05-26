@@ -1,3 +1,4 @@
+import { titleProgressLabel } from '../../domain/titleRules';
 import { TITLE_CATALOG } from '../../domain/titles';
 import type { MeProfile } from '../../domain/profileTypes';
 import './MeTab.css';
@@ -11,6 +12,12 @@ export interface MeTitlesGridProps {
 
 export function MeTitlesGrid({ profile, editing, equipping, onEquip }: MeTitlesGridProps) {
   const unlocked = new Set(profile.unlockedTitleIds);
+  const stats = {
+    totalShots: profile.totalShots,
+    correctShots: profile.correctShots,
+    rankedMatchesPlayed: profile.rankedMatchesPlayed,
+    unlockedTitleIds: profile.unlockedTitleIds,
+  };
 
   return (
     <section className="me-titles" aria-label="Titles">
@@ -31,7 +38,9 @@ export function MeTitlesGrid({ profile, editing, equipping, onEquip }: MeTitlesG
               aria-pressed={isEquipped}
             >
               <span className="me-titles__name">{title.name}</span>
-              <span className="me-titles__hint">{isUnlocked ? title.hint : 'Locked'}</span>
+              <span className="me-titles__hint">
+                {isUnlocked ? title.hint : titleProgressLabel(title.id, stats)}
+              </span>
               {isEquipped ? <span className="me-titles__badge">Equipped</span> : null}
             </button>
           );

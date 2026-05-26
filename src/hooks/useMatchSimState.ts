@@ -28,7 +28,7 @@ const EMPTY_CLOCK: MatchClockState = {
 export function useMatchSimState(): MatchSimState {
   const sim = getMatchSim();
   const [clock, setClock] = useState<MatchClockState>(() => sim.getState() ?? EMPTY_CLOCK);
-  const [events, setEvents] = useState<NormalizedEvent[]>([]);
+  const [events, setEvents] = useState<NormalizedEvent[]>(() => sim.getDeliveredEvents());
   const [paused, setPaused] = useState(() => sim.isPaused());
 
   useEffect(() => {
@@ -43,8 +43,9 @@ export function useMatchSimState(): MatchSimState {
       });
     });
     const clearEvents = () => setEvents([]);
+    const syncDelivered = () => setEvents(sim.getDeliveredEvents());
     const offReady = sim.bus.on('ready', () => {
-      clearEvents();
+      syncDelivered();
       setPaused(sim.isPaused());
     });
     const offReset = sim.bus.on('reset', () => {

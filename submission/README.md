@@ -58,6 +58,16 @@ zip PitchPulse.zip github_link.txt presentation_video.mp4 executive_summary.pdf
 
 The resulting `PitchPulse.zip` (or `<TeamName>.zip`) is what gets uploaded.
 
+## Validate before zipping
+
+From the repo root (after `presentation_video.mp4` and `executive_summary.pdf` are in this folder):
+
+```bash
+npm run verify:submission
+```
+
+Fix any ✗ errors (missing files, placeholder GitHub URL) before running `Compress-Archive` / `zip`.
+
 ## Final checklist (run through this once before uploading)
 
 - [ ] `github_link.txt` points to the correct public/private URL

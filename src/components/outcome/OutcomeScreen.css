@@ -1,0 +1,313 @@
+/* Ranked post-match outcome overlays — full-screen takeover (Gate C) */
+
+.ranked-outcome-shell,
+.ranked-postmatch-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  min-height: 100%;
+}
+
+.ranked-postmatch-shell .ranked-promo {
+  position: absolute;
+}
+
+.outcome-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.outcome-overlay.is-entering {
+  animation-name: outcome-overlay-in;
+}
+
+.outcome-overlay.is-exiting {
+  animation-name: outcome-overlay-out;
+}
+
+@keyframes outcome-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes outcome-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.outcome-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 72px;
+  text-align: center;
+  position: relative;
+}
+
+/* ─── Win ─────────────────────────────────────────────────────────────────── */
+
+.outcome-screen--win {
+  background: linear-gradient(165deg, #0f3d2e 0%, #1e5c42 100%);
+  animation: outcome-win-bg-pulse 3.5s ease-in-out infinite;
+}
+
+@keyframes outcome-win-bg-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.06);
+  }
+}
+
+.outcome-screen__glow--gold {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 215, 110, 0.35) 0%, transparent 70%);
+  pointer-events: none;
+  animation: outcome-gold-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes outcome-gold-glow {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+.outcome-screen__headline--victory {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0 0 20px;
+  color: #fff;
+  text-shadow: 0 0 32px rgba(245, 215, 110, 0.45);
+  animation: outcome-headline-in 400ms ease-out both;
+}
+
+/* ─── Lose ────────────────────────────────────────────────────────────────── */
+
+.outcome-screen--lose {
+  background: linear-gradient(165deg, #0b0f1f 0%, #1a2438 100%);
+}
+
+.outcome-screen__headline--over {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0 0 20px;
+  color: rgba(255, 255, 255, 0.7);
+  animation: outcome-headline-in 400ms ease-out both;
+}
+
+/* ─── Draw ────────────────────────────────────────────────────────────────── */
+
+.outcome-screen--draw {
+  background: linear-gradient(165deg, #1a1a2e 0%, #2d2d44 100%);
+}
+
+.outcome-screen__headline--draw {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0 0 20px;
+  color: rgba(255, 255, 255, 0.85);
+  animation: outcome-headline-in 400ms ease-out both;
+}
+
+@keyframes outcome-headline-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Shared content ─────────────────────────────────────────────────────── */
+
+.outcome-screen__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+}
+
+.outcome-screen__names {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+}
+
+.outcome-screen__names--muted {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.outcome-screen__names--draw {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.outcome-screen__names-action {
+  font-weight: 500;
+}
+
+.outcome-screen__score {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.outcome-screen__score-you {
+  color: #f5d76e;
+}
+
+.outcome-screen__score-opp {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.outcome-screen__score--neutral {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.outcome-screen__score--neutral span {
+  color: inherit;
+}
+
+.outcome-screen__score--draw {
+  color: rgba(200, 210, 235, 0.9);
+}
+
+.outcome-screen__score-sep {
+  opacity: 0.5;
+}
+
+.outcome-screen__score-draw-left {
+  display: inline-block;
+  animation: outcome-draw-tension-left 2s ease-in-out infinite;
+}
+
+.outcome-screen__score-draw-right {
+  display: inline-block;
+  animation: outcome-draw-tension-right 2s ease-in-out infinite;
+}
+
+@keyframes outcome-draw-tension-left {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(10px);
+  }
+}
+
+@keyframes outcome-draw-tension-right {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-10px);
+  }
+}
+
+.outcome-screen__tagline {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.outcome-screen__subtext {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 280px;
+}
+
+.outcome-screen__tap {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  z-index: 3;
+}
+
+.outcome-screen__tap.is-visible {
+  opacity: 1;
+}
+
+/* ─── Confetti (win only) ─────────────────────────────────────────────────── */
+
+.outcome-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.outcome-confetti__piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 1px;
+  opacity: 0.9;
+  animation-name: outcome-confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes outcome-confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.6;
+  }
+}

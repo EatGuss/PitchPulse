@@ -34,7 +34,7 @@ export function DemoPage() {
 
       <div className="demo__stage">
         <PhoneFrame label={`${alice.displayName} — ${aliceTeam.full} fan`} subLabel={alice.archetypeName}>
-          <PhoneEntryFlow hideSimControls />
+          <PhoneEntryFlow hideSimControls forcedUserId="alice" />
         </PhoneFrame>
 
         <div className="demo__bridge">
@@ -59,7 +59,7 @@ export function DemoPage() {
         </div>
 
         <PhoneFrame label={`${bob.displayName} — ${bobTeam.full} fan`} subLabel={bob.archetypeName}>
-          <PhoneEntryFlow hideSimControls />
+          <PhoneEntryFlow hideSimControls forcedUserId="bob" />
         </PhoneFrame>
       </div>
 

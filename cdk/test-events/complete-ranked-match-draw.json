@@ -1,0 +1,18 @@
+{
+  "info": {
+    "fieldName": "completeRankedMatch"
+  },
+  "arguments": {
+    "matchId": "DFL-MAT-000001",
+    "winnerId": "alice",
+    "loserId": "bob",
+    "winnerMatchPoints": 420,
+    "loserMatchPoints": 420,
+    "winnerShotsInMatch": 8,
+    "winnerCorrectInMatch": 5,
+    "loserShotsInMatch": 8,
+    "loserCorrectInMatch": 5,
+    "winnerPointsAtHalfTime": 200,
+    "loserPointsAtHalfTime": 210
+  }
+}

@@ -17,6 +17,7 @@ import { RoomMemberSidebar } from '../components/RoomMemberSidebar';
 import { ReactionBar } from '../components/ReactionBar';
 import { ReactionStream } from '../components/ReactionStream';
 import { BadgeToast } from '../components/BadgeToast';
+import { TitleUnlockToast } from '../components/TitleUnlockToast';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
@@ -175,7 +176,7 @@ export function MatchPage({
         myPickedOptionId={myPickedOptionId}
         viewerId={userId}
         onVote={handleVote}
-        pickRevealMode={inWatchRoom ? 'live' : 'both-voted'}
+        pickRevealMode={inWatchRoom ? 'live' : inRanked ? 'ranked' : 'both-voted'}
         roomMembers={watchRoom?.members}
         roomId={inWatchRoom ? watchRoom?.roomId : undefined}
         matchPaused={paused}
@@ -186,6 +187,7 @@ export function MatchPage({
         rivalHotTakeActive={inRanked && !!prompt && rivalHotTakePromptId === prompt.id}
       />
       <BadgeToast viewerId={userId} />
+      {inRanked ? <TitleUnlockToast viewerId={userId} /> : null}
     </div>
   );
 }

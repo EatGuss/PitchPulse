@@ -17,7 +17,12 @@
 
 import { TypedEventBus } from './eventBus';
 import { getMatchSim } from './matchSim';
-import { consumeHotTake, HOT_TAKE_MULTIPLIER, resetHotTakeState } from './hotTakeStore';
+import {
+  consumeHotTake,
+  HOT_TAKE_MULTIPLIER,
+  refundHotTake,
+  resetHotTakeState,
+} from './hotTakeStore';
 import { PROMPT_TEMPLATES } from '../data/promptTemplates';
 import { DEMO_USERS } from '../data/personas';
 import type {
@@ -194,6 +199,39 @@ export class PromptEngine {
     return true;
   }
 
+  /**
+   * Toggle Hot Take on an existing ranked vote while the prompt is still open.
+   */
+  setVoteHotTake(
+    promptId: string,
+    userId: string,
+    enabled: boolean,
+    matchId: string,
+  ): boolean {
+    const a = this.active;
+    if (!a || a.id !== promptId || a.state !== 'open') return false;
+    if (!this.rankedScoring) return false;
+    if (!(userId in a.userVotes)) return false;
+    if (getMatchSim().isPaused()) return true;
+
+    if (!a.userHotTakes) a.userHotTakes = {};
+    const wasHot = a.userHotTakes[userId] === true;
+
+    if (enabled) {
+      if (wasHot) return true;
+      if (!consumeHotTake(matchId, userId)) return false;
+      a.userHotTakes[userId] = true;
+    } else if (wasHot) {
+      a.userHotTakes[userId] = false;
+      refundHotTake(matchId, userId);
+    } else {
+      a.userHotTakes[userId] = false;
+    }
+
+    this.bus.emit('promptUpdated', { prompt: this.snapshot(a) });
+    return true;
+  }
+
   // ─── private ──────────────────────────────────────────────────────────────
 
   private unsubClock?: () => void;
@@ -327,7 +365,19 @@ export class PromptEngine {
       const won = pickedOption === winningOptionId;
 
       user.totalVoted += 1;
-      user.history.push({ promptId: a.id, pickedOptionId: pickedOption, won, payout });
+      const pickedLabel =
+        a.options.find((o) => o.id === pickedOption)?.label ?? pickedOption;
+      user.history.push({
+        promptId: a.id,
+        round: user.history.length + 1,
+        copy: a.copy,
+        pickedOptionId: pickedOption,
+        pickedLabel,
+        won,
+        payout,
+        baseReward: a.baseReward,
+        hotTake: a.userHotTakes?.[userId] === true,
+      });
 
       if (won) {
         user.matchPoints += payout;
@@ -349,6 +399,13 @@ export class PromptEngine {
         }
       }
       this.bus.emit('userStreakChanged', { userId, streak: user.streak });
+    }
+
+    for (const user of this.users.values()) {
+      if (user.userId in a.userVotes) continue;
+      if (user.streak === 0) continue;
+      user.streak = 0;
+      this.bus.emit('userStreakChanged', { userId: user.userId, streak: 0 });
     }
 
     this.bus.emit('promptResolved', { prompt: this.snapshot(a) });

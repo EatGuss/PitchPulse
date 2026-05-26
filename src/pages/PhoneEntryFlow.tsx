@@ -3,10 +3,16 @@
  * Mode Picker removed (Gate C). Users land on Home after onboarding.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { OnboardingScreen } from '../components/OnboardingScreen';
 import { AppShell } from '../components/AppShell';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
+import {
+  claimDemoPersona,
+  isDemoPersonaAvailable,
+  otherDemoPersona,
+  releaseDemoPersona,
+} from '../sim/demoPersonaLock';
 
 function isDemoUserId(value: string | null): value is DemoUserId {
   return value !== null && value in DEMO_USERS;
@@ -15,6 +21,8 @@ function isDemoUserId(value: string | null): value is DemoUserId {
 export interface PhoneEntryFlowProps {
   hideSimControls?: boolean;
   syncUrl?: boolean;
+  /** /demo: lock this frame to Alice or Bob so both phones cannot pick the same fan. */
+  forcedUserId?: DemoUserId;
   onUserChange?: (userId: DemoUserId | null) => void;
 }
 
@@ -27,15 +35,28 @@ function readUrlUserId(): DemoUserId | null {
 export function PhoneEntryFlow({
   hideSimControls = false,
   syncUrl = false,
+  forcedUserId,
   onUserChange,
 }: PhoneEntryFlowProps) {
-  const [userId, setUserId] = useState<DemoUserId | null>(() =>
-    syncUrl ? readUrlUserId() : null,
-  );
+  const lockTokenRef = useRef(Symbol('demo-persona'));
+  const [userId, setUserId] = useState<DemoUserId | null>(() => {
+    if (forcedUserId) return forcedUserId;
+    return syncUrl ? readUrlUserId() : null;
+  });
+  const [personaConflict, setPersonaConflict] = useState(false);
 
   useEffect(() => {
     onUserChange?.(userId);
   }, [userId, onUserChange]);
+
+  useEffect(() => {
+    if (!forcedUserId) return;
+    const token = lockTokenRef.current;
+    const ok = claimDemoPersona(forcedUserId, token);
+    setPersonaConflict(!ok);
+    if (ok) setUserId(forcedUserId);
+    return () => releaseDemoPersona(forcedUserId, token);
+  }, [forcedUserId]);
 
   useEffect(() => {
     if (!syncUrl) return;
@@ -45,6 +66,17 @@ export function PhoneEntryFlow({
   }, [syncUrl]);
 
   const handleContinue = (chosen: DemoUserId) => {
+    if (forcedUserId) return;
+    if (!isDemoPersonaAvailable(chosen)) {
+      setPersonaConflict(true);
+      return;
+    }
+    const token = lockTokenRef.current;
+    if (!claimDemoPersona(chosen, token)) {
+      setPersonaConflict(true);
+      return;
+    }
+    setPersonaConflict(false);
     setUserId(chosen);
     if (syncUrl) {
       const url = new URL(window.location.href);
@@ -57,6 +89,8 @@ export function PhoneEntryFlow({
   };
 
   const handleSwitchUser = () => {
+    if (forcedUserId) return;
+    if (userId) releaseDemoPersona(userId, lockTokenRef.current);
     setUserId(null);
     if (syncUrl) {
       const url = new URL(window.location.href);
@@ -68,15 +102,38 @@ export function PhoneEntryFlow({
     }
   };
 
+  if (personaConflict && forcedUserId) {
+    const other = DEMO_USERS[otherDemoPersona(forcedUserId)];
+    return (
+      <div className="tab-shell" role="alert">
+        <h1 className="tab-shell__title">Profile in use</h1>
+        <p className="tab-shell__sub">
+          {DEMO_USERS[forcedUserId].displayName} is already active on the other phone in this demo.
+          Refresh the page or use the {other.displayName} frame.
+        </p>
+      </div>
+    );
+  }
+
   if (userId === null) {
-    return <OnboardingScreen onContinue={handleContinue} />;
+    return (
+      <OnboardingScreen
+        onContinue={handleContinue}
+        allowedUserIds={
+          forcedUserId
+            ? [forcedUserId]
+            : ['alice', 'bob'].filter((id) => isDemoPersonaAvailable(id as DemoUserId)) as DemoUserId[]
+        }
+        personaConflict={personaConflict}
+      />
+    );
   }
 
   return (
     <AppShell
       userId={userId}
       hideSimControls={hideSimControls}
-      onSwitchUser={handleSwitchUser}
+      onSwitchUser={forcedUserId ? undefined : handleSwitchUser}
       syncUrl={syncUrl}
     />
   );

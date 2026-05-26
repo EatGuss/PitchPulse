@@ -59,6 +59,19 @@ export function useHotTake({ enabled, userId, rivalUserId }: UseHotTakeOptions):
   useEffect(() => {
     if (!enabled) return;
     const engine = getPromptEngine();
+    const clearRival = () => setRivalHotTakePromptId(null);
+    const offs = [
+      engine.bus.on('promptOpened', clearRival),
+      engine.bus.on('promptClosed', clearRival),
+      engine.bus.on('promptResolved', clearRival),
+      engine.bus.on('reset', clearRival),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const engine = getPromptEngine();
     const offWon = engine.bus.on('hotTakeWon', ({ userId: winnerId }) => {
       if (winnerId !== userId) return;
       void commitUnlockHotTakeHero(userId);
@@ -66,27 +79,53 @@ export function useHotTake({ enabled, userId, rivalUserId }: UseHotTakeOptions):
     return offWon;
   }, [enabled, userId]);
 
+  const applyHotTakeToggle = useCallback(
+    (on: boolean) => {
+      setHotTakeOn(on);
+      if (!enabled) return;
+
+      const engine = getPromptEngine();
+      const active = engine.getActive();
+      if (!active || active.state !== 'open' || !(userId in active.userVotes)) return;
+
+      const ok = engine.setVoteHotTake(active.id, userId, on, MATCH_ID);
+      if (!ok) {
+        setHotTakeOn(false);
+        return;
+      }
+
+      void syncSubmitVote(active.id, userId, active.userVotes[userId]!, on, true);
+      if (on && rivalUserId) {
+        void syncSignalHotTake(active.id, userId, rivalUserId);
+      }
+    },
+    [enabled, rivalUserId, userId],
+  );
+
   const vote = useCallback(
     (promptId: string, optionId: string): boolean => {
       if (!enabled) return false;
-      const useHotTake = hotTakeOn && remaining > 0;
       const engine = getPromptEngine();
       const ok = engine.submitVote(promptId, userId, optionId, {
-        hotTake: useHotTake,
+        hotTake: false,
         matchId: MATCH_ID,
       });
       if (!ok) return false;
 
-      void syncSubmitVote(promptId, userId, optionId, useHotTake, true);
-      if (useHotTake && rivalUserId) {
-        void syncSignalHotTake(promptId, userId, rivalUserId);
+      void syncSubmitVote(promptId, userId, optionId, false, true);
+      if (hotTakeOn && remaining > 0) {
+        applyHotTakeToggle(true);
       }
-
-      setHotTakeOn(false);
       return true;
     },
-    [enabled, hotTakeOn, remaining, rivalUserId, userId],
+    [applyHotTakeToggle, enabled, hotTakeOn, remaining, userId],
   );
 
-  return { remaining, hotTakeOn, setHotTakeOn, rivalHotTakePromptId, vote };
+  return {
+    remaining,
+    hotTakeOn,
+    setHotTakeOn: applyHotTakeToggle,
+    rivalHotTakePromptId,
+    vote,
+  };
 }

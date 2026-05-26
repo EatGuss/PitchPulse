@@ -17,7 +17,18 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import type { AppSyncResolverEvent } from 'aws-lambda';
-import { appsyncMutation, NOTIFY_TITLE_UNLOCKED, PUBLISH_LEADERBOARD_UPDATED } from '../shared/appsyncPublish';
+import {
+  appsyncMutation,
+  NOTIFY_TIER_PROMOTED,
+  NOTIFY_TITLE_UNLOCKED,
+  PUBLISH_LEADERBOARD_UPDATED,
+} from '../shared/appsyncPublish';
+import {
+  evaluateTitleUnlocks,
+  lifetimeAccuracyRatio,
+  type RankedMatchEndContext,
+  type TitleStats,
+} from '../shared/titleRules';
 import {
   getIsoWeekKey,
   nextMondayMidnightBerlinIso,
@@ -125,6 +136,14 @@ export const handler = async (event: AppSyncResolverEvent<Record<string, unknown
         event.arguments.loserId as string,
         event.arguments.winnerMatchPoints as number,
         event.arguments.loserMatchPoints as number,
+        {
+          winnerShotsInMatch: event.arguments.winnerShotsInMatch as number | undefined,
+          winnerCorrectInMatch: event.arguments.winnerCorrectInMatch as number | undefined,
+          loserShotsInMatch: event.arguments.loserShotsInMatch as number | undefined,
+          loserCorrectInMatch: event.arguments.loserCorrectInMatch as number | undefined,
+          winnerPointsAtHalfTime: event.arguments.winnerPointsAtHalfTime as number | undefined,
+          loserPointsAtHalfTime: event.arguments.loserPointsAtHalfTime as number | undefined,
+        },
       );
     default:
       throw new Error(`Unsupported field: ${event.info.fieldName}`);
@@ -452,15 +471,194 @@ async function publishLeaderboardUpdates(isoWeek: string, seasonNumber: number):
   }
 }
 
+interface MatchTitleStatsInput {
+  winnerShotsInMatch?: number;
+  winnerCorrectInMatch?: number;
+  loserShotsInMatch?: number;
+  loserCorrectInMatch?: number;
+  winnerPointsAtHalfTime?: number;
+  loserPointsAtHalfTime?: number;
+}
+
+async function applyMatchShots(
+  userId: string,
+  shots: number | undefined,
+  correct: number | undefined,
+): Promise<void> {
+  if (shots === undefined || shots <= 0) return;
+  const correctN = Math.min(correct ?? 0, shots);
+  await ddb.send(
+    new UpdateItemCommand({
+      TableName: USERS_TABLE,
+      Key: marshall({ PK: `USER#${userId}`, SK: 'PROFILE' }),
+      UpdateExpression:
+        'ADD totalShots :shots, correctShots :correct SET updatedAt = :ts',
+      ExpressionAttributeValues: marshall({
+        ':shots': shots,
+        ':correct': correctN,
+        ':ts': Date.now(),
+      }),
+    }),
+  );
+  const profile = await loadProfile(userId);
+  const acc = lifetimeAccuracyRatio({
+    totalShots: profile.totalShots ?? 0,
+    correctShots: profile.correctShots ?? 0,
+    rankedMatchesPlayed: profile.rankedMatchesPlayed ?? 0,
+    unlockedTitles: profile.unlockedTitles ?? [],
+  });
+  if (acc === null) return;
+  await ddb.send(
+    new UpdateItemCommand({
+      TableName: USERS_TABLE,
+      Key: marshall({ PK: `USER#${userId}`, SK: 'PROFILE' }),
+      UpdateExpression: 'SET lifetimeAccuracy = :acc, updatedAt = :ts',
+      ExpressionAttributeValues: marshall({ ':acc': acc, ':ts': Date.now() }),
+    }),
+  );
+}
+
+function profileTitleStats(profile: UserProfile): TitleStats {
+  return {
+    totalShots: profile.totalShots ?? 0,
+    correctShots: profile.correctShots ?? 0,
+    rankedMatchesPlayed: profile.rankedMatchesPlayed ?? 0,
+    unlockedTitles: profile.unlockedTitles ?? [],
+  };
+}
+
+async function persistTitleUnlocks(userId: string, titleIds: string[]): Promise<void> {
+  if (titleIds.length === 0) return;
+  const profile = await loadProfile(userId);
+  const merged = new Set([...(profile.unlockedTitles ?? []), ...titleIds]);
+  await ddb.send(
+    new UpdateItemCommand({
+      TableName: USERS_TABLE,
+      Key: marshall({ PK: `USER#${userId}`, SK: 'PROFILE' }),
+      UpdateExpression: 'SET unlockedTitles = :titles, updatedAt = :ts',
+      ExpressionAttributeValues: marshall({
+        ':titles': Array.from(merged),
+        ':ts': Date.now(),
+      }),
+    }),
+  );
+  const ts = Date.now();
+  for (const titleId of titleIds) {
+    try {
+      await appsyncMutation(NOTIFY_TITLE_UNLOCKED, {
+        userId,
+        titleId,
+        titleName: TITLE_NAMES[titleId] ?? titleId,
+        ts,
+      });
+    } catch (err) {
+      console.error(JSON.stringify({ msg: 'title unlock publish failed', err: String(err) }));
+    }
+  }
+}
+
+async function evaluateAndUnlockTitles(
+  userId: string,
+  matchEnd?: RankedMatchEndContext,
+  scope: 'accuracy' | 'matchEnd' | 'all' = 'all',
+): Promise<void> {
+  const profile = await loadProfile(userId);
+  const fresh = evaluateTitleUnlocks(profileTitleStats(profile), matchEnd, scope);
+  await persistTitleUnlocks(userId, fresh);
+}
+
+async function completeRankedDrawMatch(
+  matchId: string,
+  player1Id: string,
+  player2Id: string,
+  matchPoints: number,
+  titleInput: MatchTitleStatsInput = {},
+) {
+  const ts = Date.now();
+  const bumpPlayed = async (userId: string) => {
+    await ddb.send(
+      new UpdateItemCommand({
+        TableName: USERS_TABLE,
+        Key: marshall({ PK: `USER#${userId}`, SK: 'PROFILE' }),
+        UpdateExpression:
+          'SET rankedMatchesPlayed = if_not_exists(rankedMatchesPlayed, :zero) + :one, updatedAt = :ts',
+        ExpressionAttributeValues: marshall({ ':zero': 0, ':one': 1, ':ts': ts }),
+      }),
+    );
+  };
+
+  await bumpPlayed(player1Id);
+  await bumpPlayed(player2Id);
+
+  await applyRankedMatchPoints(player1Id, matchPoints);
+  await applyRankedMatchPoints(player2Id, matchPoints);
+
+  await markRankedMatchdayPlayed(player1Id, DEMO_MATCHDAY_ID, matchPoints);
+  await markRankedMatchdayPlayed(player2Id, DEMO_MATCHDAY_ID, matchPoints);
+
+  await applyMatchShots(player1Id, titleInput.winnerShotsInMatch, titleInput.winnerCorrectInMatch);
+  await applyMatchShots(player2Id, titleInput.loserShotsInMatch, titleInput.loserCorrectInMatch);
+
+  const p1Ht = titleInput.winnerPointsAtHalfTime ?? 0;
+  const p2Ht = titleInput.loserPointsAtHalfTime ?? 0;
+  const player1End: RankedMatchEndContext = {
+    shotsInMatch: titleInput.winnerShotsInMatch ?? 0,
+    correctInMatch: titleInput.winnerCorrectInMatch ?? 0,
+    pointsAtHalfTime: p1Ht,
+    opponentPointsAtHalfTime: p2Ht,
+    wonMatch: false,
+  };
+  const player2End: RankedMatchEndContext = {
+    shotsInMatch: titleInput.loserShotsInMatch ?? 0,
+    correctInMatch: titleInput.loserCorrectInMatch ?? 0,
+    pointsAtHalfTime: p2Ht,
+    opponentPointsAtHalfTime: p1Ht,
+    wonMatch: false,
+  };
+
+  await evaluateAndUnlockTitles(player1Id, player1End, 'matchEnd');
+  await evaluateAndUnlockTitles(player2Id, player2End, 'matchEnd');
+  await evaluateAndUnlockTitles(player1Id, undefined, 'accuracy');
+  await evaluateAndUnlockTitles(player2Id, undefined, 'accuracy');
+
+  const player1Profile = await loadProfile(player1Id);
+  const isoWeek = getIsoWeekKey();
+  const seasonNumber = player1Profile.seasonNumber ?? 1;
+  await publishLeaderboardUpdates(isoWeek, seasonNumber);
+
+  return {
+    matchId,
+    winnerId: player1Id,
+    loserId: player2Id,
+    winnerTier: player1Profile.tier ?? 'BRONZE',
+    winnerTierWins: player1Profile.tierWinsTowardNext ?? 0,
+    promoted: false,
+    newTier: null,
+    isDraw: true,
+    outcome: 'DRAW',
+  };
+}
+
 async function completeRankedMatch(
   matchId: string,
   winnerId: string,
   loserId: string,
   winnerMatchPoints: number,
   loserMatchPoints: number,
+  titleInput: MatchTitleStatsInput = {},
 ) {
   await ensureProfile(winnerId);
   await ensureProfile(loserId);
+
+  if (winnerMatchPoints === loserMatchPoints) {
+    return completeRankedDrawMatch(
+      matchId,
+      winnerId,
+      loserId,
+      winnerMatchPoints ?? 0,
+      titleInput,
+    );
+  }
 
   const winnerProfile = await loadProfile(winnerId);
   const currentTier = winnerProfile.tier ?? 'BRONZE';
@@ -516,9 +714,48 @@ async function completeRankedMatch(
   await markRankedMatchdayPlayed(winnerId, DEMO_MATCHDAY_ID, winnerMatchPoints ?? 0);
   await markRankedMatchdayPlayed(loserId, DEMO_MATCHDAY_ID, loserMatchPoints ?? 0);
 
+  await applyMatchShots(winnerId, titleInput.winnerShotsInMatch, titleInput.winnerCorrectInMatch);
+  await applyMatchShots(loserId, titleInput.loserShotsInMatch, titleInput.loserCorrectInMatch);
+
+  const winnerHt = titleInput.winnerPointsAtHalfTime ?? 0;
+  const loserHt = titleInput.loserPointsAtHalfTime ?? 0;
+  const winnerEnd: RankedMatchEndContext = {
+    shotsInMatch: titleInput.winnerShotsInMatch ?? 0,
+    correctInMatch: titleInput.winnerCorrectInMatch ?? 0,
+    pointsAtHalfTime: winnerHt,
+    opponentPointsAtHalfTime: loserHt,
+    wonMatch: true,
+  };
+  const loserEnd: RankedMatchEndContext = {
+    shotsInMatch: titleInput.loserShotsInMatch ?? 0,
+    correctInMatch: titleInput.loserCorrectInMatch ?? 0,
+    pointsAtHalfTime: loserHt,
+    opponentPointsAtHalfTime: winnerHt,
+    wonMatch: false,
+  };
+
+  await evaluateAndUnlockTitles(winnerId, winnerEnd, 'matchEnd');
+  await evaluateAndUnlockTitles(loserId, loserEnd, 'matchEnd');
+  await evaluateAndUnlockTitles(winnerId, undefined, 'accuracy');
+  await evaluateAndUnlockTitles(loserId, undefined, 'accuracy');
+
   const isoWeek = getIsoWeekKey();
   const seasonNumber = (await loadProfile(winnerId)).seasonNumber ?? 1;
   await publishLeaderboardUpdates(isoWeek, seasonNumber);
+
+  if (promoted && newTier) {
+    const ts = Date.now();
+    try {
+      await appsyncMutation(NOTIFY_TIER_PROMOTED, {
+        userId: winnerId,
+        previousTier: currentTier,
+        newTier,
+        ts,
+      });
+    } catch (err) {
+      console.error(JSON.stringify({ msg: 'tier promoted publish failed', err: String(err) }));
+    }
+  }
 
   return {
     matchId,
@@ -528,5 +765,7 @@ async function completeRankedMatch(
     winnerTierWins: tierWins,
     promoted,
     newTier: promoted ? newTier : null,
+    isDraw: false,
+    outcome: null,
   };
 }

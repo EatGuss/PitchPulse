@@ -1,7 +1,8 @@
 /**
  * Live pick badges below the prompt card.
  *   - watch-room: reveal each member's pick as soon as they vote
- *   - both-voted: reveal only after all demo fans have voted (Ranked)
+ *   - both-voted: reveal only after all demo fans have voted (legacy)
+ *   - ranked: never reveal opponent picks (1v1 hidden until resolution)
  */
 
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
@@ -11,7 +12,7 @@ import './LivePickReveal.css';
 
 const PUBLIC_VOTERS: DemoUserId[] = ['alice', 'bob'];
 
-export type PickRevealMode = 'live' | 'both-voted';
+export type PickRevealMode = 'live' | 'both-voted' | 'ranked';
 
 export interface LivePickRevealProps {
   prompt: PromptInstance;
@@ -22,6 +23,10 @@ export interface LivePickRevealProps {
 }
 
 export function LivePickReveal({ prompt, viewerId, mode, members = [] }: LivePickRevealProps) {
+  if (mode === 'ranked') {
+    return null;
+  }
+
   const voters =
     mode === 'live'
       ? members.map((m) => m.userId)

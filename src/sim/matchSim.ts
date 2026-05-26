@@ -74,6 +74,8 @@ export class MatchSim {
   private seenEventIds = new Set<string>();
   /** True while the demo Pause control has frozen the replay. */
   private paused = false;
+  /** Events already emitted — for late-joining UI subscribers. */
+  private deliveredEvents: NormalizedEvent[] = [];
 
   /** Fetches the prebuilt events.json. Idempotent. */
   async load(): Promise<void> {
@@ -97,6 +99,7 @@ export class MatchSim {
     const freshKickoff = this.startedAt === null || this.state.phase === 'preMatch';
 
     if (freshKickoff) {
+      this.deliveredEvents = [];
       this.startedAt = performance.now();
       this.cursor = 0;
       this.state = {
@@ -158,6 +161,7 @@ export class MatchSim {
     this.paused = false;
     this.hasBootstrappedScore = false;
     this.seenEventIds.clear();
+    this.deliveredEvents = [];
     this.state = {
       matchMinute: 0,
       displayClock: "0'",
@@ -175,6 +179,11 @@ export class MatchSim {
 
   getState(): MatchClockState {
     return this.state;
+  }
+
+  /** All events emitted so far (local replay + AWS injections). */
+  getDeliveredEvents(): NormalizedEvent[] {
+    return [...this.deliveredEvents];
   }
 
   isLoaded(): boolean {
@@ -229,6 +238,7 @@ export class MatchSim {
     if (scoreChanged && event.scoreAfter) {
       this.state = { ...this.state, score: event.scoreAfter };
     }
+    this.deliveredEvents.push(event);
     this.bus.emit('event', event);
     // Emit the clock update AFTER the event so React's batched render shows
     // the goal card and updated score in the same frame.
@@ -250,6 +260,7 @@ export class MatchSim {
     // Drain any due events.
     while (this.cursor < this.events.length && this.events[this.cursor].matchMinute <= matchMinute) {
       const ev = this.events[this.cursor++];
+      this.deliveredEvents.push(ev);
       this.bus.emit('event', ev);
       if (ev.scoreAfter) this.state = { ...this.state, score: ev.scoreAfter };
       if (ev.type === 'fullTime') {

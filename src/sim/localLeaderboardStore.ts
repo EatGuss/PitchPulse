@@ -4,18 +4,8 @@
 
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import type { LeaderboardEntry, UserStats } from '../domain/leaderboardTypes';
-import type { Tier } from '../domain/tiers';
 import { TypedEventBus } from './eventBus';
-
-const DEMO_TIER: Record<DemoUserId, Tier> = {
-  alice: 'SILVER',
-  bob: 'GOLD',
-};
-
-const DEMO_TITLE: Record<DemoUserId, string> = {
-  alice: 'Sharpshooter',
-  bob: 'Sharpshooter',
-};
+import { localGetMeProfile } from './localProfileStore';
 
 interface StandingRow {
   weeklyPoints: number;
@@ -43,11 +33,12 @@ function sortedEntries(pointsKey: 'weeklyPoints' | 'seasonalPoints', limit: numb
   const rows = (Object.keys(DEMO_USERS) as DemoUserId[])
     .map((userId) => {
       const standing = byUser.get(userId)!;
+      const profile = localGetMeProfile(userId, standing.weeklyPoints, standing.seasonalPoints);
       return {
         userId,
         displayName: DEMO_USERS[userId].displayName,
-        equippedTitle: DEMO_TITLE[userId],
-        tier: DEMO_TIER[userId],
+        equippedTitle: profile.equippedTitle,
+        tier: profile.tier,
         points: standing[pointsKey],
       };
     })
@@ -84,6 +75,7 @@ export function localGetSeasonalLeaderboard(limit = 100): LeaderboardEntry[] {
 
 export function localGetUserStats(userId: DemoUserId): UserStats {
   const row = byUser.get(userId) ?? { weeklyPoints: 0, seasonalPoints: 0 };
+  const profile = localGetMeProfile(userId, row.weeklyPoints, row.seasonalPoints);
   const weekly = localGetWeeklyLeaderboard(100);
   const seasonal = localGetSeasonalLeaderboard(100);
   return {
@@ -95,15 +87,13 @@ export function localGetUserStats(userId: DemoUserId): UserStats {
     seasonNumber: DEMO_SEASON_NUMBER,
     seasonEndsAt: DEMO_SEASON_ENDS_AT,
     weeklyPointsResetAt: DEMO_WEEKLY_RESET_AT,
-    tier: DEMO_TIER[userId] ?? 'BRONZE',
-    equippedTitleId: DEMO_TITLE[userId] ? 'sharpshooter' : null,
-    equippedTitle: DEMO_TITLE[userId] ?? null,
-    unlockedTitleIds: userId === 'alice'
-      ? ['sharpshooter', 'sniper', 'analyst', 'veteran']
-      : ['sharpshooter', 'oracle', 'comeback-king', 'veteran'],
-    tierWinsTowardNext: userId === 'alice' ? 4 : 4,
-    lifetimeAccuracy: userId === 'alice' ? 0.62 : 0.58,
-    rankedMatchesPlayed: userId === 'alice' ? 12 : 15,
+    tier: profile.tier,
+    equippedTitleId: profile.equippedTitleId,
+    equippedTitle: profile.equippedTitle,
+    unlockedTitleIds: profile.unlockedTitleIds,
+    tierWinsTowardNext: profile.tierWinsTowardNext,
+    lifetimeAccuracy: profile.lifetimeAccuracy,
+    rankedMatchesPlayed: profile.rankedMatchesPlayed,
   };
 }
 

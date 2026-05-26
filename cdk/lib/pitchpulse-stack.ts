@@ -344,6 +344,7 @@ export class PitchPulseStack extends Stack {
         resources: [
           `${api.arn}/types/Mutation/fields/publishLeaderboardUpdated`,
           `${api.arn}/types/Mutation/fields/notifyTitleUnlocked`,
+          `${api.arn}/types/Mutation/fields/notifyTierPromoted`,
         ],
       }),
     );
@@ -560,6 +561,7 @@ export class PitchPulseStack extends Stack {
           `${api.arn}/types/Mutation/fields/lockInRankedMatch`,
           `${api.arn}/types/Mutation/fields/equipTitle`,
           `${api.arn}/types/Mutation/fields/unlockHotTakeHero`,
+          `${api.arn}/types/Mutation/fields/completeRankedMatch`,
           // Client-receivable queries (Gate B)
           `${api.arn}/types/Query/fields/weeklyLeaderboard`,
           `${api.arn}/types/Query/fields/seasonalLeaderboard`,

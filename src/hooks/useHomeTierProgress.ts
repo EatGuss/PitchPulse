@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DemoUserId } from '../data/personas';
 import type { Tier } from '../domain/tiers';
+import { localGetTierProgress, subscribeLocalProfileChanged } from '../sim/localProfileStore';
 import { subscribeMatchdayStore } from '../sim/matchdayStore';
 
 export interface TierProgress {
@@ -10,18 +11,18 @@ export interface TierProgress {
   nextTier: Tier | null;
 }
 
-const LOCAL_TIER: Record<DemoUserId, TierProgress> = {
-  alice: { tier: 'SILVER', winsTowardNext: 4, winsNeeded: 5, nextTier: 'GOLD' },
-  bob: { tier: 'GOLD', winsTowardNext: 4, winsNeeded: 5, nextTier: 'DIAMOND' },
-};
-
 export function useHomeTierProgress(userId: DemoUserId): TierProgress {
-  const [progress, setProgress] = useState<TierProgress>(() => LOCAL_TIER[userId]);
+  const [progress, setProgress] = useState<TierProgress>(() => localGetTierProgress(userId));
 
   useEffect(() => {
-    const refresh = () => setProgress({ ...LOCAL_TIER[userId] });
+    const refresh = () => setProgress(localGetTierProgress(userId));
     refresh();
-    return subscribeMatchdayStore(refresh);
+    const offMatchday = subscribeMatchdayStore(refresh);
+    const offProfile = subscribeLocalProfileChanged(refresh);
+    return () => {
+      offMatchday();
+      offProfile();
+    };
   }, [userId]);
 
   return progress;

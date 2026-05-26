@@ -112,6 +112,18 @@
   margin: 4px 0 0;
 }
 
+.onb__conflict {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: var(--pp-r-sm);
+  background: rgba(225, 14, 31, 0.12);
+  border: 1px solid rgba(225, 14, 31, 0.35);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pp-text);
+  text-align: center;
+}
+
 .onb__user {
   display: flex;
   align-items: center;

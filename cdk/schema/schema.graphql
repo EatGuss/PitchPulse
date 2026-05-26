@@ -149,6 +149,10 @@ type RankedOpponent @aws_iam {
   opponentTitle: String
 }
 
+enum RankedMatchOutcome {
+  DRAW
+}
+
 type RankedMatchResult @aws_iam {
   matchId: ID!
   winnerId: ID!
@@ -157,6 +161,10 @@ type RankedMatchResult @aws_iam {
   winnerTierWins: Int!
   promoted: Boolean!
   newTier: Tier
+  """True when match points were equal; tier wins unchanged for both players."""
+  isDraw: Boolean!
+  """Set to DRAW when isDraw; win/lose per user derived from winnerId vs userId."""
+  outcome: RankedMatchOutcome
 }
 
 type TierPromotedEvent @aws_iam {
@@ -383,6 +391,12 @@ type Mutation @aws_iam {
     loserId: ID!
     winnerMatchPoints: Int!
     loserMatchPoints: Int!
+    winnerShotsInMatch: Int
+    winnerCorrectInMatch: Int
+    loserShotsInMatch: Int
+    loserCorrectInMatch: Int
+    winnerPointsAtHalfTime: Int
+    loserPointsAtHalfTime: Int
   ): RankedMatchResult
   notifyTierPromoted(userId: ID!, previousTier: Tier!, newTier: Tier!, ts: AWSTimestamp!): TierPromotedEvent
   notifyTitleUnlocked(userId: ID!, titleId: ID!, titleName: String!, ts: AWSTimestamp!): TitleUnlockedEvent

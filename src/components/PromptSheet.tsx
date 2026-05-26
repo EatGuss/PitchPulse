@@ -76,6 +76,7 @@ function OptionButton({
   label,
   sublabel,
   pct,
+  hideVotePercent = false,
   picked,
   disabled,
   state,
@@ -86,6 +87,7 @@ function OptionButton({
   label: string;
   sublabel?: string;
   pct: number;
+  hideVotePercent?: boolean;
   picked: boolean;
   disabled: boolean;
   state: PromptInstance['state'];
@@ -106,12 +108,16 @@ function OptionButton({
     .join(' ');
   return (
     <button type="button" className={cls} onClick={onClick} disabled={disabled} aria-pressed={picked}>
-      <span className="ps-opt__bar" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      {!hideVotePercent && (
+        <span className="ps-opt__bar" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      )}
       <span className="ps-opt__body">
         <span className="ps-opt__label">{label}</span>
         {sublabel && <span className="ps-opt__sub">{sublabel}</span>}
       </span>
-      <span className="ps-opt__pct tabular">{Math.round(pct)}%</span>
+      {!hideVotePercent && (
+        <span className="ps-opt__pct tabular">{Math.round(pct)}%</span>
+      )}
       {picked && (
         <span className="ps-opt__check" aria-hidden="true">
           ✓
@@ -276,7 +282,9 @@ export function PromptSheet({
             {prompt.state === 'open' ? (
               <CountdownRing secondsLeft={secondsLeft} totalSeconds={WINDOW_REAL_SEC} />
             ) : (
-              <span className="ps__votes tabular">{totalVotes} votes</span>
+              !fixedScoring && (
+                <span className="ps__votes tabular">{totalVotes} votes</span>
+              )
             )}
             {canCollapse && (
               <button
@@ -350,7 +358,6 @@ export function PromptSheet({
             remaining={hotTakeRemaining}
             enabled={hotTakeOn}
             onChange={onHotTakeChange}
-            disabled={myPickedOptionId !== null}
           />
         )}
 
@@ -367,6 +374,7 @@ export function PromptSheet({
                 label={opt.label}
                 sublabel={opt.sublabel}
                 pct={pct}
+                hideVotePercent={fixedScoring}
                 picked={picked}
                 disabled={disabled}
                 state={prompt.state}

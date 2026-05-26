@@ -198,6 +198,46 @@ export const FIND_RANKED_MATCH = /* GraphQL */ `
   }
 `;
 
+export const COMPLETE_RANKED_MATCH = /* GraphQL */ `
+  mutation CompleteRankedMatch(
+    $matchId: ID!
+    $winnerId: ID!
+    $loserId: ID!
+    $winnerMatchPoints: Int!
+    $loserMatchPoints: Int!
+    $winnerShotsInMatch: Int
+    $winnerCorrectInMatch: Int
+    $loserShotsInMatch: Int
+    $loserCorrectInMatch: Int
+    $winnerPointsAtHalfTime: Int
+    $loserPointsAtHalfTime: Int
+  ) {
+    completeRankedMatch(
+      matchId: $matchId
+      winnerId: $winnerId
+      loserId: $loserId
+      winnerMatchPoints: $winnerMatchPoints
+      loserMatchPoints: $loserMatchPoints
+      winnerShotsInMatch: $winnerShotsInMatch
+      winnerCorrectInMatch: $winnerCorrectInMatch
+      loserShotsInMatch: $loserShotsInMatch
+      loserCorrectInMatch: $loserCorrectInMatch
+      winnerPointsAtHalfTime: $winnerPointsAtHalfTime
+      loserPointsAtHalfTime: $loserPointsAtHalfTime
+    ) {
+      matchId
+      winnerId
+      loserId
+      winnerTier
+      winnerTierWins
+      promoted
+      newTier
+      isDraw
+      outcome
+    }
+  }
+`;
+
 export const RANKED_MATCHDAY_STATUS = /* GraphQL */ `
   query RankedMatchdayStatus($userId: ID!, $matchdayId: ID!) {
     rankedMatchdayStatus(userId: $userId, matchdayId: $matchdayId) {
@@ -264,6 +304,18 @@ export const USER_STATS = /* GraphQL */ `
       equippedTitle
       lifetimeAccuracy
       rankedMatchesPlayed
+      unlockedTitles
+    }
+  }
+`;
+
+export const SUB_TITLE_UNLOCKED = /* GraphQL */ `
+  subscription OnTitleUnlocked($userId: ID!) {
+    titleUnlocked(userId: $userId) {
+      userId
+      titleId
+      titleName
+      ts
     }
   }
 `;

@@ -7,6 +7,7 @@ import { isAwsMode } from '../aws/config';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import { resetLocalLeaderboardStore } from './localLeaderboardStore';
 import { resetLocalProfileStore } from './localProfileStore';
+import { resetTitleUnlockSession } from './titleUnlockEngine';
 import { resetHotTakeState } from './hotTakeStore';
 import { resetLocalRoomStore } from './localRoomStore';
 import { resetRankedMatchdayPlay } from './matchdayStore';
@@ -21,6 +22,7 @@ export function resetDemoClientState(): ResetDemoStateResult {
   resetRankedMatchdayPlay();
   resetLocalLeaderboardStore();
   resetLocalProfileStore();
+  resetTitleUnlockSession();
   resetHotTakeState();
 
   for (const userId of Object.keys(DEMO_USERS) as DemoUserId[]) {

@@ -10,6 +10,7 @@
  */
 
 import { useState } from 'react';
+import { DemoRedirectBanner } from '../components/DemoRedirectBanner';
 import { PhoneFrame } from '../components/PhoneFrame';
 import { DataDisclosure } from '../components/DataDisclosure';
 import { PhoneEntryFlow, phoneEntryUserLabel } from './PhoneEntryFlow';
@@ -37,6 +38,7 @@ export function SinglePhonePage() {
         padding: '24px 16px',
       }}
     >
+      <DemoRedirectBanner />
       <PhoneFrame label={chrome.label} subLabel={chrome.subLabel}>
         <PhoneEntryFlow syncUrl onUserChange={setFrameUserId} />
       </PhoneFrame>

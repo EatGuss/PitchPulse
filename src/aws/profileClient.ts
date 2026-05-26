@@ -6,9 +6,11 @@ import { generateClient } from 'aws-amplify/api';
 import type { DemoUserId } from '../data/personas';
 import type { MeProfile } from '../domain/profileTypes';
 import { normalizeLifetimeAccuracy } from '../domain/accuracy';
+import { filterValidUnlockedTitleIds } from '../domain/titleRules';
 import { fetchUserStats } from './leaderboardClient';
 import { isAwsMode } from './config';
 import { EQUIP_TITLE, UNLOCK_HOT_TAKE_HERO } from './operations';
+import { notifyLocalTitleUnlock } from './titleUnlockClient';
 import {
   localEquipTitle,
   localGetMeProfile,
@@ -28,14 +30,37 @@ export async function fetchMeProfile(userId: DemoUserId): Promise<MeProfile> {
 
     if (!isAwsMode) return base;
 
+    const rankedMatchesPlayed = stats.rankedMatchesPlayed ?? base.rankedMatchesPlayed;
+    const lifetimeAccuracy =
+      normalizeLifetimeAccuracy(stats.lifetimeAccuracy) ?? base.lifetimeAccuracy;
+    const titleStats = {
+      totalShots: base.totalShots,
+      correctShots: base.correctShots,
+      rankedMatchesPlayed,
+      unlockedTitleIds: [] as string[],
+    };
+    const rawUnlocked =
+      stats.unlockedTitleIds.length > 0 ? stats.unlockedTitleIds : base.unlockedTitleIds;
+    const unlockedTitleIds = filterValidUnlockedTitleIds(titleStats, rawUnlocked);
+    const equippedTitleId =
+      stats.equippedTitleId && unlockedTitleIds.includes(stats.equippedTitleId)
+        ? stats.equippedTitleId
+        : base.equippedTitleId && unlockedTitleIds.includes(base.equippedTitleId)
+          ? base.equippedTitleId
+          : unlockedTitleIds[0] ?? null;
+
     return {
       ...base,
-      tier: stats.tier ?? base.tier,
-      equippedTitleId: stats.equippedTitleId ?? base.equippedTitleId,
-      equippedTitle: stats.equippedTitle ?? base.equippedTitle,
-      lifetimeAccuracy:
-        normalizeLifetimeAccuracy(stats.lifetimeAccuracy) ?? base.lifetimeAccuracy,
-      rankedMatchesPlayed: stats.rankedMatchesPlayed ?? base.rankedMatchesPlayed,
+      // Tier progression matches Home — always from localProfileStore (demo narrative).
+      tier: base.tier,
+      tierWinsTowardNext: base.tierWinsTowardNext,
+      equippedTitleId,
+      equippedTitle: equippedTitleId
+        ? (stats.equippedTitle ?? base.equippedTitle ?? null)
+        : null,
+      unlockedTitleIds,
+      lifetimeAccuracy,
+      rankedMatchesPlayed,
     };
   } catch (err) {
     console.warn('[profile] fetchMeProfile failed — using local demo profile', err);
@@ -82,7 +107,8 @@ export function recordRankedMatchForProfile(
 }
 
 export async function commitUnlockHotTakeHero(userId: DemoUserId): Promise<boolean> {
-  localUnlockTitle(userId, 'hot-take-hero');
+  const added = localUnlockTitle(userId, 'hot-take-hero');
+  if (added) notifyLocalTitleUnlock(userId, 'hot-take-hero');
 
   if (!isAwsMode) return true;
 

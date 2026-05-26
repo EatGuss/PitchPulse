@@ -108,7 +108,19 @@ export interface UserState {
   streak: number;        // consecutive correct predictions (Gate 3 surfaces visually)
   totalCorrect: number;  // for badges (Gate 3)
   totalVoted: number;
-  history: Array<{ promptId: string; pickedOptionId: string; won: boolean; payout: number }>;
+  history: PromptHistoryEntry[];
+}
+
+export interface PromptHistoryEntry {
+  promptId: string;
+  round: number;
+  copy: string;
+  pickedOptionId: string;
+  pickedLabel: string;
+  won: boolean;
+  payout: number;
+  baseReward: number;
+  hotTake: boolean;
 }
 
 /** Reasons a prompt may not have fired even though its trigger condition matched. */

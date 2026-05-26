@@ -82,10 +82,11 @@ export function AppShell({
   const { clock } = useMatchSimState();
   const schedule = useMatchdaySchedule();
 
-  const inMatchTakeover = rankedInMatch || watchInMatch;
   const matchIsLive =
     clock.phase !== 'preMatch' && clock.phase !== 'fullTime';
-  const hideBottomNav = inMatchTakeover && matchIsLive;
+  const rankedPostMatchOverlay = rankedInMatch && clock.phase === 'fullTime';
+  const hideBottomNav =
+    rankedPostMatchOverlay || (watchInMatch && matchIsLive) || (rankedInMatch && matchIsLive);
 
   const [rankedFixtureId, setRankedFixtureId] = useState<string | null>(null);
   const [competeResetKey, setCompeteResetKey] = useState(0);
