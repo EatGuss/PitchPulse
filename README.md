@@ -4,7 +4,7 @@ Real-time social Bundesliga matchday companion — submission for the **DFL × A
 
 Two fans, one matchday. Live event ticker, predict-the-next-moment prompts, PitchPoints, weekly/seasonal standings, collectible titles, and badges — all reacting to a replayed Bundesliga match in real time.
 
-> **Status:** MVP complete through **Gate J** (Hot Take UI). Four-tab app shell, ranked 1v1, Watch Rooms, Standings, and Me profile are shipped on `feature/remove-publicmatch-and-livesheet`. See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
+> **Status:** MVP complete through **Gate J** (Hot Take UI) plus ranked post-match flow (outcome screens → tier promotion → match summary) on `main`. See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
 
 ---
 
@@ -67,22 +67,20 @@ After onboarding, the app opens on four tabs:
 
 ## Data & licensing disclosure
 
-This app replays the **anonymized DFL match XML** provided in the hackathon S3 bucket:
+**Hackathon data is not in this repository and must not be uploaded here.** Match replay reads from the official challenge bucket at runtime (or from a **gitignored** local copy on your machine only).
 
-```
-s3://hackathon-data-058755927272/Challenge 3 – A Real Time Social Match Experience/
-  ├── data/Match-Events/Events_Anonym.xml              (816 KB — event stream)
-  ├── data/Match-Events/MatchInformations_Anonym.xml   (12 KB  — lineups + meta)
-  └── ...
-```
+### Source bucket (Challenge 3)
 
-The match is internally identified as **`DFL-MAT-000001`**, with anonymized teams *"FC Team"* (`FCT`) vs *"Club"* (`CLU`), final score **5:0**. Player names in the source are German numeral placeholders (`Spieler Eins` through `Spieler Zwanzig`).
+| | |
+|---|---|
+| **S3 bucket** | `hackathon-data-058755927272` |
+| **Objects used** | `Challenge 3 – A Real Time Social Match Experience/data/Match-Events/Events_Anonym.xml` and `.../MatchInformations_Anonym.xml` |
 
-For narrative cohesion we **display these teams as "FC Bayern" (FCB) and "Borussia Dortmund" (BVB)** with subtle team-color accents. **No real-world club crests, kits, logos, or player photos are used anywhere in the app.** Player numbers shown in the UI come straight from the XML; player names rendered are the anonymized placeholders from the source data.
+Deployed **`pp-sim-emitter`** loads both keys via `s3:GetObject` (see `HACKATHON_DATA_BUCKET`, `MATCH_EVENTS_KEY`, `MATCH_INFO_KEY` in `.env.example` / CDK). No other prefixes in that bucket are used by PitchPulse.
 
-A persistent disclosure line is rendered on `/demo`, `/`, and the onboarding screen so this is visible during any screen recording.
+The match is **`DFL-MAT-000001`** (*FC Team* vs *Club*, 5:0 in the anonymized XML). UI team labels are narrative aliases only (`src/data/teamAliases.ts`). **No crests, kits, logos, or player photos.**
 
-**The hackathon XML is never committed to this repository.** The `.gitignore` blocks `/data/`, `.env.local`, `/cdk.out/`, and CDK output artifacts. Per challenge brief §10, the data stays in the existing `hackathon-data-058755927272` S3 bucket; the deployed `sim-emitter` Lambda reads it via an IAM-scoped `s3:GetObject`.
+A disclosure line is shown on `/demo`, `/`, and onboarding. Per challenge brief §10, raw XML stays in S3; `.gitignore` blocks `/data/`, `public/events.json`, `public/match-info.json`, and CDK outputs.
 
 ---
 
@@ -158,17 +156,12 @@ cd PitchPulse
 npm install
 ```
 
-### 1. Download the hackathon data (one-time)
+### 1. Match data (S3 only — not in git)
 
-The XML is **not** in the repo. Pull it from the hackathon S3 bucket using your sandbox AWS profile:
+Use either path:
 
-```bash
-mkdir -p data/Match-Events data/documentation
-aws s3 cp "s3://hackathon-data-058755927272/Challenge 3 – A Real Time Social Match Experience/data/Match-Events/Events_Anonym.xml" \
-  data/Match-Events/ --profile <YOUR_ISB_PROFILE> --region eu-central-1
-aws s3 cp "s3://hackathon-data-058755927272/Challenge 3 – A Real Time Social Match Experience/data/Match-Events/MatchInformations_Anonym.xml" \
-  data/Match-Events/ --profile <YOUR_ISB_PROFILE> --region eu-central-1
-```
+- **AWS-backed sim (recommended for reviewers):** deploy CDK ([below](#how-to-deploy-to-aws)), fill AppSync/Cognito in `.env.local` — the emitter reads **`hackathon-data-058755927272`** directly.
+- **In-browser sim:** optionally mirror the two XML keys from that bucket into gitignored `data/Match-Events/` on your machine, then `npm run parse` — never commit those files or derived JSON.
 
 ### 2. Configure environment
 
@@ -280,34 +273,111 @@ The hackathon S3 bucket is external — the stack only attaches a read-only poli
 
 ## How to demo this
 
-**Always use `/demo`, not `/`.** The two-phone stage is required for Watch Room and Ranked flows (two fans, one shared match clock). Seed data is already loaded in the browser — refresh or **⌫ Demo state** only if you need a clean ranked promotion run (Alice **Silver → Gold** on one win).
+This section is a **self-service walkthrough** — follow it top to bottom on a fresh clone. For a timed video shot list with overlay copy, see [`docs/demo-script.md`](./docs/demo-script.md).
 
-Full shot-by-shot script: [`docs/demo-script.md`](./docs/demo-script.md).
+### Before you start
 
-### Watch Room cut (~3 min)
+| Requirement | Why |
+|---|---|
+| **Node 22+**, `npm install` | Builds the Vite app |
+| **Match replay source** | Deployed stack reads **`s3://hackathon-data-058755927272`** (two XML keys above); or local parse from a gitignored mirror — see [Data & licensing disclosure](#data--licensing-disclosure) |
+| **`.env.local`** from `.env.example` | Optional for local-only demo; fill AppSync/Cognito only if you want the AWS-backed sim |
+| **Route `/demo`** | Two phones (Alice left, Bob right), one shared match clock — **required** for Watch Room and Ranked |
 
-1. Open `http://127.0.0.1:5173/demo` at **1920×1080**. Both phone frames visible.
-2. Complete onboarding on both phones → **Home**.
-3. **Bob** → **Compete** → **Watch Room** → **Create Room** → note invite code (e.g. `PLZ-482`).
-4. **Alice** → **Compete** → **Watch Room** → **Enter Code** → joins lobby. Bob taps **Start Match**.
-5. Click **▶ Kick off**. Both phones tick together; same event card within ~200 ms.
-6. Prompt fires → Alice votes → Bob sees live pick reveal → Bob votes → **Comments** thread on the prompt.
-7. Resolution → PitchPoints animation → room sidebar reorders. 🔥 reaction from Alice puffs on Bob's screen.
-8. Full-time → final room standings.
+**Local-only demo (recommended first):** leave `VITE_APPSYNC_URL` empty in `.env.local`. The match runs in the browser; both `/demo` frames share in-memory state. No AWS account needed.
 
-### Ranked + Hot Take cut (optional B-roll)
+**Tighter prompts while exploring:** in `.env.local` set `VITE_PROMPT_WINDOW_MS=5000` and `VITE_SIM_SECONDS_PER_MATCH_MINUTE=2` (full match ≈ 3 real minutes).
 
-1. **Home** → lock in a live fixture before kickoff.
-2. **Compete** → **Ranked** → matchmaking → live 1v1.
-3. On a prompt, toggle **Hot Take** → vote. Rival sees the hot take signal; correct hot takes pay **2.5×** and can unlock the **Hot Take Hero** title.
-4. Full-time → post-match summary → **Standings** / **Me** tabs for leaderboard and tier progress.
+**Do not use `/` for the hackathon demo.** That route is one phone only. Ranked 1v1 and Watch Rooms need two personas on `/demo`.
 
-### Recording rules
+### Quick start (about 5 minutes)
 
-- **No voice-over.** Text overlays + on-screen labels only.
-- **Record at 1920×1080** with **`/demo` open** — not the single-phone `/` route. Both phone frames visible the entire time.
-- **Phone-frame chrome stays on** for the recording. `?frame=off` on `/` is for layout testing only.
-- **`VITE_PROMPT_WINDOW_MS=5000`** keeps demo cadence tight (~3 prompts in a 3-minute playback). Spec default is `30000`.
+```bash
+git clone <repo-url>
+cd PitchPulse
+npm install
+cp .env.example .env.local
+# Fill VITE_APPSYNC_* after cdk deploy, OR use gitignored local XML mirror (see "How to run locally")
+npm run dev
+```
+
+Open **`http://127.0.0.1:5173/demo`** (not `localhost` — Vite is bound to `127.0.0.1`).
+
+1. **Onboarding** — complete the short intro on **both** phone frames (Alice and Bob are fixed; you cannot switch personas on `/demo`).
+2. You should land on **Home** on both phones with seeded data: Alice **Silver 4/5**, Bob **Gold 4/8**, sample standings and match history on **Me**.
+3. Use the center **MATCH SIM** bar between the phones for **▶ Kick off**, pause, and **⌫ Demo state**.
+
+If **Kick off** does nothing or the feed stays empty, you need either AWS sim configured in `.env.local` or a gitignored local parse — see [How to run locally](#how-to-run-locally).
+
+### Demo A — Watch Room (multiplayer social)
+
+Goal: private room, invite code, live picks, comments, reactions.
+
+| Step | Who | Action |
+|:---:|---|---|
+| 1 | Both | Stay on **Home** after onboarding |
+| 2 | Bob | Bottom nav **Compete** → sub-tab **Live & Watch Rooms** → **Create Room** |
+| 3 | Bob | Note the invite code on the lobby card (e.g. `PLZ-482`); tap to copy if needed |
+| 4 | Alice | **Compete** → **Live & Watch Rooms** → **Enter Code** → type Bob's code → **Join Room** |
+| 5 | Bob | In the lobby, tap **Start Match** |
+| 6 | Center bar | **▶ Kick off** — both clocks should tick together; event cards appear on both feeds |
+| 7 | Both | When a **prompt** opens, vote within the window. Alice's pick appears on Bob's screen as a live reveal (and vice versa) |
+| 8 | Alice | Expand **Comments** on a prompt, send a short line — Bob sees it in the same thread |
+| 9 | Alice | Tap a reaction (e.g. 🔥) — animation appears on Bob's phone |
+| 10 | Both | Play through to **Full time** — room sidebar shows final PitchPoints standings |
+
+**What you should see:** vote-share % on options (Watch Room only), minority-correct rewards, badge toasts, room leaderboard reordering after resolutions.
+
+### Demo B — Ranked 1v1 (competitive + post-match flow)
+
+Goal: lock-in, hidden picks, Hot Take, outcome screen, optional rank-up, match summary.
+
+**Reset first** if you already played a ranked match: center bar **⌫ Demo state** (restores Alice **Silver 4/5**, Bob **Gold 4/8**, clears lock-in).
+
+| Step | Who | Action |
+|:---:|---|---|
+| 1 | Both | **Home** → **Select your match** (or hero lock-in) → choose the primary fixture → confirm lock-in |
+| 2 | Center | **▶ Kick off** (ranked requires the sim clock running) |
+| 3 | Both | **Compete** → sub-tab **Ranked** → **Play Ranked** (or **Home** → **Play Ranked** when offered) |
+| 4 | Both | Wait for **matchmaking** → **opponent reveal** (tier + equipped title; Bob shows **Gold**, Alice **Silver**) |
+| 5 | Both | Play the live match: picks stay **hidden** until both vote; no vote % shown in ranked |
+| 6 | Optional | Toggle **Hot Take** on a prompt (max 2 per match) — rival sees the signal; correct pays **2.5×** |
+| 7 | Full time | Post-match sequence (ranked only): **Outcome** (Victory / Match Over / Draw) → tap to continue |
+| 8 | Alice only (if she wins and promotes) | **Welcome to Gold** full-screen promotion (from Silver 4/5 + 1 win) |
+| 9 | Both | **Match Summary** — points breakdown, weekly/seasonal **+Xp from this match**, tier bar, round timeline |
+| 10 | Alice | **Me** tab — tier bar now **Gold**, titles grid; **Standings** for weekly board |
+
+**Tip for a promotion run:** vote so Alice ends with more match points than Bob. Bob should see **Match Over** and stay at **Gold 4/8** without a promotion overlay.
+
+**Draw path:** tie match points → **Draw** outcome → summary for both; weekly/seasonal match points still apply; no tier promotion.
+
+### Demo C — AWS-backed sim (optional)
+
+If `.env.local` has `VITE_APPSYNC_URL` and `VITE_COGNITO_IDENTITY_POOL_ID` from `cdk deploy`, restart `npm run dev`. Console should log `[aws-bridge] attached`. **Kick off** then calls `startMatch` in Lambda; both phones subscribe to the same AppSync events. Steps above are the same; only the event source changes.
+
+Deploy steps: [How to deploy to AWS](#how-to-deploy-to-aws).
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Blank event feed / parse error | Deploy AWS sim (reads `hackathon-data-058755927272`) or parse from a gitignored local mirror — do not add XML to the repo |
+| **Ranked not available** after full time | You are not on `/demo`, or sim was reset mid-match — lock fixture again and replay |
+| Only one phone / no opponent | Use **`/demo`**, not `/` |
+| Watch Room code rejected | Both must use **⌫ Demo state** or fresh tab; codes are local to this browser session in local-only mode |
+| Promotion does not show | **⌫ Demo state**, replay ranked, ensure Alice **wins** on points from **Silver 4/5** |
+| `public/events.json` missing in git | **Expected** — generated locally; never committed (hackathon data policy) |
+
+### Repo files you may see locally (safe to ignore)
+
+If you invoke Lambdas manually (`aws lambda invoke … --output json cdk/ranked-out.json`), CDK leaves **response dumps** such as `cdk/ranked-out.json`, `cdk/lb-out.json`, `cdk/stats-out.json`. They are **not** read by the frontend or `npm run dev` and **do not** affect `/demo`. They are gitignored so they never ship in the repo.
+
+### Recording a submission video
+
+- **URL:** `http://127.0.0.1:5173/demo` at **1920×1080**, both frames visible.
+- **No voice-over** — on-screen UI + optional text overlays (see demo script).
+- **Phone chrome stays on** — do not use `?frame=off` in the recording.
+- **Shot list:** [`docs/demo-script.md`](./docs/demo-script.md) (Watch Room ~3 min + ranked appendix).
 
 ---
 
@@ -332,7 +402,8 @@ Full shot-by-shot script: [`docs/demo-script.md`](./docs/demo-script.md).
 - [x] **Gate I** — Hot Take backend (`vote-handler`, `signalHotTake`, title unlock)
 - [x] **Gate J** — Hot Take UI (toggle, rival indicator, resolution copy)
 - [x] **Ranked branch Gate E** — Titles rules, progress copy, unlock toasts, server `completeRankedMatch` stats (see Titles above)
-- [ ] **Gate K** / **Ranked branch Gate F** — Demo video, executive PDF, submission zip (in progress — see below)
+- [x] **Ranked post-match** — Outcome screens (win/lose/draw), promotion sequence, match summary
+- [ ] **Gate K** — Demo video, executive PDF, submission zip (in progress — see below)
 
 ---
 
@@ -414,6 +485,6 @@ See [`submission/README.md`](./submission/README.md) for the full checklist.
 
 ## License & repo
 
-Code in this repository is for the hackathon submission only. The replayed match data is **not** in this repo (see disclosure above). Do not redistribute the hackathon XML.
+Code in this repository is for the hackathon submission only. Match data lives in **`s3://hackathon-data-058755927272`** only — not uploaded to GitHub. Do not redistribute the hackathon XML.
 
 No licensed Bundesliga marks (crests, kits, player photos) are used anywhere in source or build artifacts. Team labels are text-only; FC Bayern / Borussia Dortmund naming is narrative-only and replaceable via `src/data/teamAliases.ts`.

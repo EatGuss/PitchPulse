@@ -177,6 +177,12 @@ cdk/start-match-payload.json
 cdk/start-match-response.json
 cdk/out.json
 
+# Local Lambda invoke response dumps (aws lambda invoke --output json file)
+cdk/lb-out.json
+cdk/ranked-out.json
+cdk/stats-out.json
+cdk/*-out.json
+
 # AWS SAM build artifacts (in case of future use)
 .aws-sam/
 
