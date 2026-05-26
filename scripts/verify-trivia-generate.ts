@@ -22,9 +22,7 @@ type Row = {
 };
 
 async function main() {
-  const { generateTriviaQuestions } = await import(
-    '../cdk/lambda/trivia-handler/generateQuestions.js'
-  );
+  const { generateTriviaQuestions } = await import('../src/domain/triviaQuestionGenerator.ts');
   const parsed = JSON.parse(readFileSync(EVENTS, 'utf8')) as { events: Row[] };
   const raw = parsed.events;
   const firstHalf = raw.filter(

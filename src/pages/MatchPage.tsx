@@ -18,6 +18,7 @@ import { ReactionBar } from '../components/ReactionBar';
 import { ReactionStream } from '../components/ReactionStream';
 import { BadgeToast } from '../components/BadgeToast';
 import { TitleUnlockToast } from '../components/TitleUnlockToast';
+import { HalfTimeTrivia } from '../components/trivia/HalfTimeTrivia';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
@@ -188,6 +189,7 @@ export function MatchPage({
       />
       <BadgeToast viewerId={userId} />
       {inRanked ? <TitleUnlockToast viewerId={userId} /> : null}
+      <HalfTimeTrivia viewerId={userId} />
     </div>
   );
 }

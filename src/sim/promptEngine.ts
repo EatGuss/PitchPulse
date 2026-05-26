@@ -146,6 +146,20 @@ export class PromptEngine {
   getUser(userId: string): UserState | undefined {
     return this.users.get(userId);
   }
+  /** Half-time trivia — flat +100 per correct, flows into match-local points. */
+  awardTriviaPoints(userId: string, points: number): void {
+    if (points <= 0) return;
+    const user = this.users.get(userId);
+    if (!user) return;
+    user.matchPoints += points;
+    this.bus.emit('userMatchPointsChanged', {
+      userId,
+      matchPoints: user.matchPoints,
+      delta: points,
+      reason: 'trivia',
+    });
+  }
+
   getAllUsers(): UserState[] {
     return Array.from(this.users.values());
   }
