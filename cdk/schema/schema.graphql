@@ -181,6 +181,68 @@ type TitleUnlockedEvent @aws_iam {
   ts: AWSTimestamp!
 }
 
+# ─── Half-time trivia (match-driven, both Ranked and Watch Room) ─────────────
+
+type TriviaOption @aws_iam {
+  id: ID!
+  label: String!
+}
+
+type TriviaQuestion @aws_iam {
+  questionId: ID!
+  questionNumber: Int!
+  text: String!
+  options: [TriviaOption!]!
+  expiresAt: AWSTimestamp!
+}
+
+type TriviaStartedEvent @aws_iam {
+  matchId: ID!
+  startsAt: AWSTimestamp!
+  questionDurationMs: Int!
+  questions: [TriviaQuestion!]!
+}
+
+type TriviaAnswerResult @aws_iam {
+  correct: Boolean!
+  pointsAwarded: Int!
+  correctOptionId: String!
+  correctLabel: String!
+}
+
+type TriviaScoreEntry @aws_iam {
+  userId: ID!
+  triviaPoints: Int!
+}
+
+type TriviaScoreUpdatedEvent @aws_iam {
+  matchId: ID!
+  scores: [TriviaScoreEntry!]!
+  updatedAt: AWSTimestamp!
+}
+
+type TriviaQuestionClosedEvent @aws_iam {
+  matchId: ID!
+  questionNumber: Int!
+  questionId: ID!
+  correctOptionId: String!
+  correctLabel: String!
+  closedAt: AWSTimestamp!
+}
+
+type TriviaCompletedEvent @aws_iam {
+  matchId: ID!
+  scores: [TriviaScoreEntry!]!
+  completedAt: AWSTimestamp!
+}
+
+type HalfTimeTriviaRound @aws_iam {
+  matchId: ID!
+  startsAt: AWSTimestamp!
+  questionDurationMs: Int!
+  questions: [TriviaQuestion!]!
+}
+
 # ─── Inputs ──────────────────────────────────────────────────────────────────
 
 input MatchClockInput {
@@ -345,12 +407,66 @@ input LeaderboardUpdatedInput {
   updatedAt: AWSTimestamp!
 }
 
+input SubmitTriviaAnswerInput {
+  matchId: ID!
+  userId: ID!
+  questionId: ID!
+  answer: String!
+}
+
+input TriviaStartedInput {
+  matchId: ID!
+  startsAt: AWSTimestamp!
+  questionDurationMs: Int!
+  questions: [TriviaQuestionInput!]!
+}
+
+input TriviaQuestionInput {
+  questionId: ID!
+  questionNumber: Int!
+  text: String!
+  options: [TriviaOptionInput!]!
+  expiresAt: AWSTimestamp!
+}
+
+input TriviaOptionInput {
+  id: ID!
+  label: String!
+}
+
+input TriviaScoreUpdatedInput {
+  matchId: ID!
+  scores: [TriviaScoreEntryInput!]!
+  updatedAt: AWSTimestamp!
+}
+
+input TriviaScoreEntryInput {
+  userId: ID!
+  triviaPoints: Int!
+}
+
+input TriviaQuestionClosedInput {
+  matchId: ID!
+  questionNumber: Int!
+  questionId: ID!
+  correctOptionId: String!
+  correctLabel: String!
+  closedAt: AWSTimestamp!
+}
+
+input TriviaCompletedInput {
+  matchId: ID!
+  scores: [TriviaScoreEntryInput!]!
+  completedAt: AWSTimestamp!
+}
+
 type Query @aws_iam {
   ping: String
   weeklyLeaderboard(limit: Int): [LeaderboardEntry!]!
   seasonalLeaderboard(seasonNumber: Int, limit: Int): [LeaderboardEntry!]!
   userStats(userId: String!): UserStats
   rankedMatchdayStatus(userId: ID!, matchdayId: ID!): RankedMatchdayStatus
+  getHalfTimeTriviaQuestions(matchId: ID!): HalfTimeTriviaRound
 }
 
 # ─── Mutations ───────────────────────────────────────────────────────────────
@@ -403,6 +519,13 @@ type Mutation @aws_iam {
 
   # Leaderboards — server-only broadcast (Gate B)
   publishLeaderboardUpdated(input: LeaderboardUpdatedInput!): LeaderboardUpdate
+
+  # Half-time trivia — client-callable + server broadcast
+  submitTriviaAnswer(input: SubmitTriviaAnswerInput!): TriviaAnswerResult
+  publishTriviaStarted(input: TriviaStartedInput!): TriviaStartedEvent
+  publishTriviaScoreUpdated(input: TriviaScoreUpdatedInput!): TriviaScoreUpdatedEvent
+  publishTriviaQuestionClosed(input: TriviaQuestionClosedInput!): TriviaQuestionClosedEvent
+  publishTriviaCompleted(input: TriviaCompletedInput!): TriviaCompletedEvent
 }
 
 # ─── Subscriptions ───────────────────────────────────────────────────────────
@@ -440,4 +563,16 @@ type Subscription @aws_iam {
 
   leaderboardUpdated(period: LeaderboardPeriod!): LeaderboardUpdate
     @aws_subscribe(mutations: ["publishLeaderboardUpdated"])
+
+  triviaStarted(matchId: ID!): TriviaStartedEvent
+    @aws_subscribe(mutations: ["publishTriviaStarted"])
+
+  triviaScoreUpdated(matchId: ID!): TriviaScoreUpdatedEvent
+    @aws_subscribe(mutations: ["publishTriviaScoreUpdated"])
+
+  triviaQuestionClosed(matchId: ID!): TriviaQuestionClosedEvent
+    @aws_subscribe(mutations: ["publishTriviaQuestionClosed"])
+
+  triviaCompleted(matchId: ID!): TriviaCompletedEvent
+    @aws_subscribe(mutations: ["publishTriviaCompleted"])
 }

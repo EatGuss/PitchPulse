@@ -18,10 +18,13 @@ import { Sha256 } from '@aws-crypto/sha256-js';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import { HttpRequest } from '@aws-sdk/protocol-http';
 import { SignatureV4 } from '@aws-sdk/signature-v4';
+import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { DynamoDBStreamEvent, DynamoDBRecord } from 'aws-lambda';
 
 const REGION = process.env.AWS_REGION ?? 'eu-central-1';
 const APPSYNC_URL = required('APPSYNC_URL');
+const TRIVIA_HANDLER_FN = process.env.TRIVIA_HANDLER_FN;
+const lambda = new LambdaClient({ region: REGION });
 
 function required(name: string): string {
   const v = process.env[name];
@@ -188,6 +191,24 @@ async function dispatch(record: DynamoDBRecord): Promise<void> {
     console.log(JSON.stringify({ msg: 'sh: publishing EVENT', input }));
     await appsyncMutation(PUBLISH_MATCH_EVENT, { input });
     console.log(JSON.stringify({ msg: 'sh: EVENT published OK', seq: input.seq, type: input.type }));
+
+    if (input.type === 'halfTime' && TRIVIA_HANDLER_FN) {
+      try {
+        await lambda.send(
+          new InvokeCommand({
+            FunctionName: TRIVIA_HANDLER_FN,
+            InvocationType: 'Event',
+            Payload: Buffer.from(
+              JSON.stringify({ action: 'startRound', matchId: input.matchId }),
+            ),
+          }),
+        );
+        console.log(JSON.stringify({ msg: 'sh: trivia startRound invoked', matchId: input.matchId }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(JSON.stringify({ msg: 'sh: trivia invoke failed', err: msg }));
+      }
+    }
     return;
   }
 
