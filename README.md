@@ -36,9 +36,7 @@ Full step-by-step walkthroughs (including the AWS-backed sim and a troubleshooti
 - [Architecture](#architecture)
 - [How to run locally](#how-to-run-locally)
 - [How to deploy to AWS](#how-to-deploy-to-aws)
-- [Build status (gates)](#build-status-gates)
 - [Project decisions worth knowing](#project-decisions-worth-knowing)
-- [What's next (deferred)](#whats-next-deferred)
 - [Submission checklist](#submission-checklist)
 - [License & repo](#license--repo)
 
@@ -400,32 +398,6 @@ The hackathon S3 bucket is external — the stack only attaches a read-only poli
 
 ---
 
-## Build status (gates)
-
-**Core MVP**
-
-- [x] **Gate 0** — Discover S3 bucket, normalize XML, lock in `.gitignore`
-- [x] **Gate 1** — Local foundation: phone-frame UI, dark theme, in-memory pub/sub, `/demo` route
-- [x] **Gate 2** — Matchday Shots (live prompts, 30s window, odds-based rewards, ≤ 8 per match)
-- [x] **Gate 3** — Watch room reactions, leaderboard, badges, streak chip
-- [x] **Gate 4** — AWS deploy: AppSync + Lambda + DynamoDB + EventBridge + Cognito via CDK
-- [x] **Gate 5** — Onboarding, tooltip polish, README, demo script, executive summary
-
-**Four-tab restructure + ranked progression**
-
-- [x] **Gate A–D** — App shell, Home tab, matchday lock-in, post-match hero states
-- [x] **Gate E** — Compete tab (Ranked vs Live & Watch Rooms), ranked matchday backend
-- [x] **Gate F** — Standings tab (weekly / seasonal)
-- [x] **Gate G** — Me tab (profile, stats, tier bar, titles, match history)
-- [x] **Gate H** — Restructure checkpoint
-- [x] **Gate I** — Hot Take backend (`vote-handler`, `signalHotTake`, title unlock)
-- [x] **Gate J** — Hot Take UI (toggle, rival indicator, resolution copy)
-- [x] **Ranked branch Gate E** — Titles rules, progress copy, unlock toasts, server `completeRankedMatch` stats (see Titles above)
-- [x] **Ranked post-match** — Outcome screens (win/lose/draw), promotion sequence, match summary
-- [ ] **Gate K** — Demo video, executive PDF, submission zip (in progress — see below)
-
----
-
 ## Project decisions worth knowing
 
 | ID | Decision |
@@ -442,63 +414,16 @@ The hackathon S3 bucket is external — the stack only attaches a read-only poli
 
 ---
 
-## What's next (deferred)
-
-- **Squad management, packs, trading, wages** — full "Spielmacher" loop from PITCHPULSE.md §6.4–6.6.
-- **Cross-device Watch Rooms** — `/demo` syncs two phones in one tab; true multi-browser rooms need shared AWS subscriptions (backend already supports this).
-- **Stadium jumbotron mode** — see [`docs/jumbotron-concept.png`](./docs/jumbotron-concept.png).
-- **React Native / Expo migration** — phone-frame web app designed for lift-and-shift once design is locked.
-- **S3 + CloudFront frontend hosting** — CDK stack has a slot; brief allows local app + AWS API calls.
-- **Late-joiner UX** — score bootstraps on refresh but EventFeed does not back-fill; a `recentEvents` query on mount would close this.
-
----
-
 ## Submission checklist
 
-The final hackathon submission zip contains:
+Submission is repo-based — reviewers clone or browse this repo directly, no zip handoff. Key files for review:
 
-```
-PitchPulse.zip
-├── github_link.txt          # link to this repo
-├── presentation_video.mp4   # ≤ 3 min, 1920×1080
-├── executive_summary.pdf    # 5 slides (export from docs/executive-summary.md)
-└── prfaq.pdf                # optional
-```
-
-Files in this repo that feed the submission:
-
+- [`README.md`](./README.md) — this document; demo walkthrough is at [How to demo this](#how-to-demo-this).
 - [`docs/demo-script.md`](./docs/demo-script.md) — shot-by-shot demo script with text-overlay copy.
-- [`docs/executive-summary.md`](./docs/executive-summary.md) — source for the 5-slide PDF.
+- [`docs/executive-summary.md`](./docs/executive-summary.md) — source for the executive summary.
 - [`docs/jumbotron-concept.png`](./docs/jumbotron-concept.png) — bonus stadium-screen concept.
-- `submission/github_link.txt` — drop the public GitHub URL here once the repo is pushed.
 
 If the repo is private, invite GitHub user `MoellerO` per the brief.
-
----
-
-## Gate K — submission packaging (in progress)
-
-Code and docs for the final handoff:
-
-| Item | Status |
-|---|---|
-| `/demo` vs `/` documented + banner on single-phone route | Done |
-| [`docs/demo-script.md`](./docs/demo-script.md) — Watch Room cut + ranked B-roll appendix | Done |
-| [`docs/executive-summary.md`](./docs/executive-summary.md) — 5-slide PDF source | Done (export PDF locally) |
-| [`submission/github_link.txt`](./submission/github_link.txt) | Done |
-| `presentation_video.mp4` | **You record** — follow demo script at 1920×1080 |
-| `executive_summary.pdf` | **You export** — from executive-summary.md |
-| Pre-zip validation | `npm run verify:submission` |
-
-```bash
-# After placing video + PDF in submission/:
-npm run verify:submission
-
-cd submission
-Compress-Archive -Path github_link.txt, presentation_video.mp4, executive_summary.pdf -DestinationPath PitchPulse.zip -Force
-```
-
-See [`submission/README.md`](./submission/README.md) for the full checklist.
 
 ---
 
