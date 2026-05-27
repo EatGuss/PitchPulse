@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { findRankedMatch } from '../aws/rankedClient';
+import { ensureAwsLockInSynced } from '../aws/rankedMatchdayClient';
 import type { DemoUserId } from '../data/personas';
 import type { RankedOpponent } from '../domain/rankedTypes';
 import { OpponentReveal } from './OpponentReveal';
@@ -25,6 +26,7 @@ export function RankedMatchmaking({ userId, onBack, onMatchStart }: RankedMatchm
 
     const run = async () => {
       try {
+        await ensureAwsLockInSynced(userId);
         const [found] = await Promise.all([
           findRankedMatch(userId),
           new Promise<void>((resolve) => setTimeout(resolve, MATCHMAKE_MS)),

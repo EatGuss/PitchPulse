@@ -60,7 +60,7 @@ export function RoomMemberSidebar({ viewerId, members, roomName }: RoomMemberSid
                 ✕
               </button>
             </div>
-            <p className="rms__sub">Room leaderboard · {members.length} fans</p>
+            <p className="rms__sub">Watch room board · {members.length} fans</p>
             <ol className="rms__list">
               {rows.map((r, idx) => {
                 const isMe = r.userId === viewerId;

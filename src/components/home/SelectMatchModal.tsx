@@ -2,6 +2,8 @@ import type { DemoUserId } from '../../data/personas';
 import {
   DEMO_MATCHDAY_FIXTURES,
   fixtureRoomLiveClock,
+  fixtureScheduleStatus,
+  fixtureUnavailablePickLabel,
   getFixtureById,
   isFixtureRoomPickable,
   resolveFixtureTitle,
@@ -10,6 +12,7 @@ import {
 import type { UserRankedMatchdayStatus } from '../../sim/matchdayStore';
 import { canLockInFixture } from '../../sim/matchdayStore';
 import { useMatchSimState } from '../../hooks/useMatchSimState';
+import { getSimKickoffWallMs } from '../../sim/matchdaySchedule';
 import './HomeModal.css';
 
 export interface SelectMatchModalProps {
@@ -24,7 +27,6 @@ export interface SelectMatchModalProps {
 
 export function SelectMatchModal({
   open,
-  schedule,
   onClose,
   onPick,
   mode = 'ranked',
@@ -32,6 +34,11 @@ export function SelectMatchModal({
   rankedStatus,
 }: SelectMatchModalProps) {
   const { clock } = useMatchSimState();
+  const liveSchedule: MatchdayScheduleContext = {
+    clockPhase: clock.phase,
+    isRunning: clock.isRunning,
+    simKickoffWallMs: getSimKickoffWallMs(),
+  };
 
   if (!open) return null;
 
@@ -66,13 +73,23 @@ export function SelectMatchModal({
           {DEMO_MATCHDAY_FIXTURES.map((f) => {
             const isCurrentPick = lockedId === f.id;
             const canPick = isRanked
-              ? !!userId && canLockInFixture(userId, f.id, schedule)
-              : isFixtureRoomPickable(f.id, schedule);
+              ? !!userId && canLockInFixture(userId, f.id, liveSchedule)
+              : isFixtureRoomPickable(f.id, liveSchedule);
             const fixture = getFixtureById(f.id);
-            const liveClock = !isRanked
-              ? fixtureRoomLiveClock(f.id, schedule, clock.displayClock)
-              : null;
-            const actionLabel = isRanked ? 'Lock In' : liveClock ? `Select (${liveClock})` : 'Select';
+            const badge = fixtureScheduleStatus(
+              f,
+              liveSchedule.clockPhase,
+              liveSchedule.isRunning,
+              liveSchedule.simKickoffWallMs,
+            );
+            const liveClock = fixtureRoomLiveClock(f.id, liveSchedule, clock.displayClock);
+            const isLive = badge === 'Live';
+            const actionLabel = isRanked
+              ? 'Lock In'
+              : liveClock
+                ? `Select (${liveClock})`
+                : 'Select';
+            const disabledLabel = fixtureUnavailablePickLabel(f.id, liveSchedule);
 
             return (
               <li key={f.id} className="home-modal__row">
@@ -93,15 +110,21 @@ export function SelectMatchModal({
                 </div>
                 {isCurrentPick ? (
                   <span className="home-modal__picked">{isRanked ? 'Your pick ✓' : 'Selected ✓'}</span>
-                ) : (
+                ) : canPick ? (
                   <button
                     type="button"
-                    className={`home-modal__lock${liveClock ? ' home-modal__lock--live' : ''}`}
-                    disabled={!canPick}
+                    className={`home-modal__lock${isLive ? ' home-modal__lock--live' : ''}`}
                     onClick={() => onPick(f.id)}
                   >
-                    {canPick ? actionLabel : 'Full time'}
+                    {actionLabel}
                   </button>
+                ) : (
+                  <span
+                    className={`home-modal__status home-modal__status--${badge.toLowerCase()}`}
+                    aria-label={`Match status: ${badge}`}
+                  >
+                    {disabledLabel}
+                  </span>
                 )}
               </li>
             );

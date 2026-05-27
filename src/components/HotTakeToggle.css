@@ -25,6 +25,11 @@
   opacity: 0.55;
 }
 
+.ht-toggle.is-on .ht-toggle__btn:disabled {
+  opacity: 1;
+  cursor: pointer;
+}
+
 .ht-toggle__icon {
   font-size: 18px;
   line-height: 1;

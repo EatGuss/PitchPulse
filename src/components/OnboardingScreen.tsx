@@ -62,7 +62,7 @@ export function OnboardingScreen({
         </div>
         <div className="onb__pill">
           <span className="onb__pill-ico" aria-hidden="true">🏆</span>
-          <span className="onb__pill-txt">Live leaderboard &amp; badges</span>
+          <span className="onb__pill-txt">Live leaderboard &amp; titles</span>
         </div>
       </div>
 

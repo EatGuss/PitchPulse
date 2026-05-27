@@ -29,10 +29,20 @@ interface LockInRankedResponse {
   lockInRankedMatch: RankedMatchdayStatusPayload;
 }
 
-function applyRemoteStatus(userId: DemoUserId, status: RankedMatchdayStatusPayload): void {
+function isFreshRankedSession(userId: DemoUserId): boolean {
   const local = getUserRankedMatchdayStatus(userId);
-  // Local full-time recording wins until the server marks played (completeRankedMatch).
-  if (local.played && !status.played) {
+  return !local.played && !local.lockedFixtureId && local.matchPoints === 0;
+}
+
+/** Passive sync (Home/Compete mount) — never import stale played/points from DynamoDB. */
+function applyPassiveRankedSync(userId: DemoUserId, status: RankedMatchdayStatusPayload): void {
+  const local = getUserRankedMatchdayStatus(userId);
+
+  if (isFreshRankedSession(userId)) {
+    return;
+  }
+
+  if (local.played) {
     hydrateRankedMatchdayStatus(userId, {
       lockedFixtureId: status.lockedFixtureId ?? local.lockedFixtureId,
       lockedFixtureLabel: status.lockedFixtureLabel ?? local.lockedFixtureLabel,
@@ -42,11 +52,23 @@ function applyRemoteStatus(userId: DemoUserId, status: RankedMatchdayStatusPaylo
     });
     return;
   }
+
   hydrateRankedMatchdayStatus(userId, {
     lockedFixtureId: status.lockedFixtureId,
     lockedFixtureLabel: status.lockedFixtureLabel,
-    played: status.played,
-    matchPoints: status.matchPoints ?? 0,
+    played: false,
+    matchPoints: 0,
+    fixtureLabel: status.lockedFixtureLabel ?? local.fixtureLabel ?? '',
+  });
+}
+
+/** After lock-in mutation — trust server lock fields; played must stay false. */
+function applyLockInResponse(userId: DemoUserId, status: RankedMatchdayStatusPayload): void {
+  hydrateRankedMatchdayStatus(userId, {
+    lockedFixtureId: status.lockedFixtureId,
+    lockedFixtureLabel: status.lockedFixtureLabel,
+    played: false,
+    matchPoints: 0,
     fixtureLabel: status.lockedFixtureLabel ?? '',
   });
 }
@@ -62,7 +84,7 @@ export async function syncRankedMatchdayFromServer(userId: DemoUserId): Promise<
 
   const status = res.data?.rankedMatchdayStatus;
   if (!status) return;
-  applyRemoteStatus(userId, status);
+  applyPassiveRankedSync(userId, status);
 }
 
 export async function commitLockInRanked(
@@ -76,6 +98,22 @@ export async function commitLockInRanked(
   }
 
   if (!isAwsMode) return true;
+
+  try {
+    await syncAwsLockIn(userId, fixtureId, fixtureLabel);
+  } catch (err) {
+    console.warn('[ranked] lock-in AWS sync failed — local lock-in kept for demo', err);
+  }
+  return true;
+}
+
+/** Best-effort push of local lock-in to DynamoDB before matchmaking. */
+export async function syncAwsLockIn(
+  userId: DemoUserId,
+  fixtureId: string,
+  fixtureLabel: string,
+): Promise<void> {
+  if (!isAwsMode) return;
 
   const client = generateClient();
   const res = (await client.graphql({
@@ -95,6 +133,17 @@ export async function commitLockInRanked(
   }
 
   const status = res.data?.lockInRankedMatch;
-  if (status) applyRemoteStatus(userId, status);
-  return true;
+  if (status) applyLockInResponse(userId, status);
+}
+
+export async function ensureAwsLockInSynced(
+  userId: DemoUserId,
+): Promise<void> {
+  const local = getUserRankedMatchdayStatus(userId);
+  if (!local.lockedFixtureId || !local.lockedFixtureLabel) return;
+  try {
+    await syncAwsLockIn(userId, local.lockedFixtureId, local.lockedFixtureLabel);
+  } catch (err) {
+    console.warn('[ranked] ensureAwsLockInSynced', err);
+  }
 }

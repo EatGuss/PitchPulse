@@ -18,9 +18,12 @@
 import { TypedEventBus } from './eventBus';
 import { getMatchSim } from './matchSim';
 import {
+  claimPromptHotTake,
   consumeHotTake,
+  getPromptHotTakeClaim,
   HOT_TAKE_MULTIPLIER,
   refundHotTake,
+  releasePromptHotTake,
   resetHotTakeState,
 } from './hotTakeStore';
 import { PROMPT_TEMPLATES } from '../data/promptTemplates';
@@ -146,20 +149,6 @@ export class PromptEngine {
   getUser(userId: string): UserState | undefined {
     return this.users.get(userId);
   }
-  /** Half-time trivia — flat +100 per correct, flows into match-local points. */
-  awardTriviaPoints(userId: string, points: number): void {
-    if (points <= 0) return;
-    const user = this.users.get(userId);
-    if (!user) return;
-    user.matchPoints += points;
-    this.bus.emit('userMatchPointsChanged', {
-      userId,
-      matchPoints: user.matchPoints,
-      delta: points,
-      reason: 'trivia',
-    });
-  }
-
   getAllUsers(): UserState[] {
     return Array.from(this.users.values());
   }
@@ -196,14 +185,27 @@ export class PromptEngine {
     if (hotTake) {
       if (!this.rankedScoring) return false;
       const matchId = opts?.matchId;
-      if (!matchId || !consumeHotTake(matchId, userId)) return false;
+      if (!matchId) return false;
+      if (this.otherUserHasHotTake(a, userId)) return false;
+      if (!claimPromptHotTake(matchId, a.id, userId)) return false;
+      if (!consumeHotTake(matchId, userId)) {
+        releasePromptHotTake(matchId, a.id, userId);
+        return false;
+      }
     }
 
     const previous = a.userVotes[userId];
     a.userVotes[userId] = optionId;
     if (!a.userHotTakes) a.userHotTakes = {};
-    if (hotTake) a.userHotTakes[userId] = true;
-    else if (!(userId in a.userHotTakes)) a.userHotTakes[userId] = false;
+    const matchId = opts?.matchId;
+    if (hotTake) {
+      a.userHotTakes[userId] = true;
+    } else {
+      a.userHotTakes[userId] = false;
+      if (matchId && getPromptHotTakeClaim(matchId, a.id) === userId) {
+        releasePromptHotTake(matchId, a.id, userId);
+      }
+    }
 
     a.voteCounts = { ...a.voteCounts };
     if (previous) a.voteCounts[previous] = Math.max(0, (a.voteCounts[previous] ?? 0) - 1);
@@ -233,13 +235,24 @@ export class PromptEngine {
 
     if (enabled) {
       if (wasHot) return true;
-      if (!consumeHotTake(matchId, userId)) return false;
+      if (this.otherUserHasHotTake(a, userId)) return false;
+      const claimHolder = getPromptHotTakeClaim(matchId, a.id);
+      if (claimHolder && claimHolder !== userId) return false;
+      if (!claimPromptHotTake(matchId, a.id, userId)) return false;
+      if (!consumeHotTake(matchId, userId)) {
+        releasePromptHotTake(matchId, a.id, userId);
+        return false;
+      }
       a.userHotTakes[userId] = true;
     } else if (wasHot) {
       a.userHotTakes[userId] = false;
       refundHotTake(matchId, userId);
+      releasePromptHotTake(matchId, a.id, userId);
     } else {
       a.userHotTakes[userId] = false;
+      if (getPromptHotTakeClaim(matchId, a.id) === userId) {
+        releasePromptHotTake(matchId, a.id, userId);
+      }
     }
 
     this.bus.emit('promptUpdated', { prompt: this.snapshot(a) });
@@ -247,6 +260,11 @@ export class PromptEngine {
   }
 
   // ─── private ──────────────────────────────────────────────────────────────
+
+  private otherUserHasHotTake(a: ActivePrompt, userId: string): boolean {
+    if (!a.userHotTakes) return false;
+    return Object.entries(a.userHotTakes).some(([uid, on]) => uid !== userId && on === true);
+  }
 
   private unsubClock?: () => void;
   private unsubEvent?: () => void;

@@ -16,7 +16,13 @@
 
 import { TypedEventBus } from './eventBus';
 import { bindMatchdaySchedule } from './matchdaySchedule';
-import type { EventsFile, MatchClockState, NormalizedEvent } from '../domain/types';
+import {
+  SECOND_HALF_START_MINUTE,
+  type EventsFile,
+  type MatchClockState,
+  type NormalizedEvent,
+} from '../domain/types';
+import { formatDisplayClock } from '../utils/matchClock';
 
 export interface SimEventMap extends Record<string, unknown> {
   clock: MatchClockState;
@@ -37,6 +43,8 @@ const _viteEnv = (import.meta as { env?: Partial<ImportMetaEnv> }).env;
 const SECONDS_PER_MATCH_MINUTE = Number(
   _viteEnv?.VITE_SIM_SECONDS_PER_MATCH_MINUTE ?? 2,
 );
+/** Real-time pause at HT before the clock resumes at 46'. */
+const HT_BREAK_REAL_MS = Number(_viteEnv?.VITE_HT_BREAK_MS ?? 4_000);
 
 export class MatchSim {
   readonly bus = new TypedEventBus<SimEventMap>();
@@ -69,13 +77,28 @@ export class MatchSim {
    * emittedAt timestamps. DDB Streams fans both writes through the
    * stream-handler → AppSync pipeline, so subscribers can see the same event
    * id more than once. Deduping here means we don't have to harden every
-   * downstream consumer (feed, prompts, badges, reactions) individually.
+   * downstream consumer (feed, prompts, reactions) individually.
    */
   private seenEventIds = new Set<string>();
   /** True while the demo Pause control has frozen the replay. */
   private paused = false;
   /** Events already emitted — for late-joining UI subscribers. */
   private deliveredEvents: NormalizedEvent[] = [];
+  /** Set once the half-time whistle event has been emitted — gates 2H playback. */
+  private halfTimeEmitted = false;
+  /** Wall-clock HT break: timer frozen at HT until 2H resumes at 46'. */
+  private inHalfTimeBreak = false;
+  private halfTimeBreakEndsAt = 0;
+  private frozenMatchMinute = 45.03;
+  private halfTimeWhistleMinute = 45.03;
+  /** True only after the HT break ends and the clock resumes at 46'. */
+  private secondHalfStarted = false;
+  /** Last 45+ display from a delivered 1H event (prevents 46/52 jumps before HT). */
+  private lastStoppageDisplay = "45'";
+  /** Index of the halfTime whistle row in events.json. */
+  private halfTimeEventIndex = -1;
+  /** Index of the post-HT kick-off (2H starts at 46'). */
+  private secondHalfStartIndex = -1;
 
   /** Fetches the prebuilt events.json. Idempotent. */
   async load(): Promise<void> {
@@ -84,6 +107,20 @@ export class MatchSim {
     if (!res.ok) throw new Error(`Failed to load /events.json (${res.status})`);
     const data: EventsFile = await res.json();
     this.events = data.events;
+    this.halfTimeEmitted = false;
+    this.inHalfTimeBreak = false;
+    this.secondHalfStarted = false;
+    this.lastStoppageDisplay = "45'";
+    this.halfTimeEventIndex = this.events.findIndex((e) => e.type === 'halfTime');
+    this.secondHalfStartIndex = this.events.findIndex(
+      (e) => e.kickOffRole === 'secondHalfStart',
+    );
+    const ht =
+      this.halfTimeEventIndex >= 0 ? this.events[this.halfTimeEventIndex] : undefined;
+    if (ht) {
+      this.halfTimeWhistleMinute = ht.matchMinute;
+      this.frozenMatchMinute = ht.matchMinute;
+    }
     this.loaded = true;
     this.bus.emit('ready', { totalEvents: this.events.length });
   }
@@ -100,6 +137,10 @@ export class MatchSim {
 
     if (freshKickoff) {
       this.deliveredEvents = [];
+      this.halfTimeEmitted = false;
+      this.inHalfTimeBreak = false;
+      this.secondHalfStarted = false;
+      this.lastStoppageDisplay = "45'";
       this.startedAt = performance.now();
       this.cursor = 0;
       this.state = {
@@ -162,6 +203,10 @@ export class MatchSim {
     this.hasBootstrappedScore = false;
     this.seenEventIds.clear();
     this.deliveredEvents = [];
+    this.halfTimeEmitted = false;
+    this.inHalfTimeBreak = false;
+    this.secondHalfStarted = false;
+    this.lastStoppageDisplay = "45'";
     this.state = {
       matchMinute: 0,
       displayClock: "0'",
@@ -172,7 +217,7 @@ export class MatchSim {
     this.bus.emit('clock', this.state);
     this.bus.emit('reset', undefined);
     if (this.loaded) {
-      // Cascade reset to prompt engine, event feed, badges, and reactions.
+      // Cascade reset to prompt engine, event feed, and reactions.
       this.bus.emit('ready', { totalEvents: this.events.length });
     }
   }
@@ -212,6 +257,14 @@ export class MatchSim {
     if (this.paused) return;
     const score = this.hasBootstrappedScore ? this.state.score : state.score;
     this.hasBootstrappedScore = true;
+    this.secondHalfStarted =
+      state.phase === 'secondHalf' ||
+      state.matchMinute >= SECOND_HALF_START_MINUTE - 0.001;
+    this.halfTimeEmitted =
+      this.secondHalfStarted ||
+      state.phase === 'halfTime' ||
+      state.displayClock === 'HT';
+    this.inHalfTimeBreak = state.phase === 'halfTime' && !this.secondHalfStarted;
     this.state = { ...state, score };
     this.bus.emit('clock', this.state);
   }
@@ -229,6 +282,7 @@ export class MatchSim {
   injectEvent(event: NormalizedEvent): void {
     if (this.paused) return;
     if (this.seenEventIds.has(event.id)) return;
+    // AWS controls emission order — never drop injected rows (defer only applies to local drain).
     this.seenEventIds.add(event.id);
 
     const scoreChanged =
@@ -238,8 +292,7 @@ export class MatchSim {
     if (scoreChanged && event.scoreAfter) {
       this.state = { ...this.state, score: event.scoreAfter };
     }
-    this.deliveredEvents.push(event);
-    this.bus.emit('event', event);
+    this.applyEventDelivery(event);
     // Emit the clock update AFTER the event so React's batched render shows
     // the goal card and updated score in the same frame.
     if (scoreChanged) {
@@ -254,56 +307,169 @@ export class MatchSim {
 
   private tick = (): void => {
     if (this.startedAt === null) return;
-    const elapsedSec = (performance.now() - this.startedAt) / 1000;
-    const matchMinute = elapsedSec / SECONDS_PER_MATCH_MINUTE;
 
-    // Drain any due events.
-    while (this.cursor < this.events.length && this.events[this.cursor].matchMinute <= matchMinute) {
-      const ev = this.events[this.cursor++];
-      this.deliveredEvents.push(ev);
-      this.bus.emit('event', ev);
-      if (ev.scoreAfter) this.state = { ...this.state, score: ev.scoreAfter };
-      if (ev.type === 'fullTime') {
-        this.bus.emit('end', { finalScore: ev.scoreAfter ?? this.state.score });
-        this.pause();
+    if (this.inHalfTimeBreak) {
+      this.drainDueEvents(this.frozenMatchMinute);
+      if (performance.now() < this.halfTimeBreakEndsAt) {
+        this.publishClock(this.frozenMatchMinute, 'halfTime', 'HT');
         return;
       }
+      this.endHalfTimeBreak();
+    }
+
+    const elapsedSec = (performance.now() - this.startedAt) / 1000;
+    let matchMinute = elapsedSec / SECONDS_PER_MATCH_MINUTE;
+
+    if (!this.secondHalfStarted) {
+      matchMinute = Math.min(matchMinute, this.halfTimeWhistleMinute);
+    } else {
+      matchMinute = Math.max(matchMinute, SECOND_HALF_START_MINUTE);
+    }
+
+    this.drainDueEvents(matchMinute);
+
+    if (this.inHalfTimeBreak) {
+      this.publishClock(this.frozenMatchMinute, 'halfTime', 'HT');
+      return;
     }
 
     const phase = this.derivePhase(matchMinute);
+    const displayClock = this.formatClock(matchMinute, phase);
+    this.publishClock(
+      this.secondHalfStarted ? matchMinute : Math.min(matchMinute, this.halfTimeWhistleMinute),
+      phase,
+      displayClock,
+    );
+  };
+
+  /** HT break over — flush HT-window rows, then snap the clock to 46'. */
+  private endHalfTimeBreak(): void {
+    this.inHalfTimeBreak = false;
+    this.drainHalfTimeWindowEvents();
+    this.secondHalfStarted = true;
+    this.startedAt =
+      performance.now() - SECOND_HALF_START_MINUTE * SECONDS_PER_MATCH_MINUTE * 1000;
+    this.drainDueEvents(SECOND_HALF_START_MINUTE);
+    const phase = this.derivePhase(SECOND_HALF_START_MINUTE);
+    this.publishClock(
+      SECOND_HALF_START_MINUTE,
+      phase,
+      formatDisplayClock(SECOND_HALF_START_MINUTE, phase),
+    );
+  }
+
+  /** Emit substitution rows that share the HT minute (45.03) before 2H kick-off. */
+  private drainHalfTimeWindowEvents(): void {
+    if (this.secondHalfStartIndex < 0) return;
+    while (this.cursor < this.secondHalfStartIndex) {
+      const ev = this.events[this.cursor];
+      if (ev.matchMinute > this.frozenMatchMinute + 0.0001) break;
+      if (this.shouldDeferEvent(ev)) break;
+      this.cursor += 1;
+      this.applyEventDelivery(ev);
+    }
+  }
+
+  private publishClock(
+    matchMinute: number,
+    phase: MatchClockState['phase'],
+    displayClock: string,
+  ): void {
     this.state = {
       ...this.state,
       matchMinute,
-      displayClock: this.formatClock(matchMinute, phase),
+      displayClock,
       phase,
     };
     this.bus.emit('clock', this.state);
-  };
+  }
+
+  /**
+   * 1H events only until the HT whistle; 2H only after HT has been emitted.
+   * Defers (does not skip) out-of-order rows so the cursor catches up once HT fires.
+   */
+  private shouldDeferEvent(ev: NormalizedEvent): boolean {
+    if (this.secondHalfStarted) {
+      return (
+        ev.matchPhase === 'firstHalf' ||
+        ev.type === 'halfTime' ||
+        ev.matchPhase === 'halfTime'
+      );
+    }
+    if (ev.matchPhase === 'secondHalf' || ev.kickOffRole === 'secondHalfStart') {
+      return true;
+    }
+    if (this.halfTimeEmitted && ev.matchPhase === 'firstHalf') {
+      return true;
+    }
+    return false;
+  }
+
+  private applyEventDelivery(ev: NormalizedEvent): void {
+    this.deliveredEvents.push(ev);
+    this.bus.emit('event', ev);
+    if (ev.matchPhase === 'firstHalf' && ev.matchMinute >= 45) {
+      this.lastStoppageDisplay = ev.displayMinute;
+      if (!this.secondHalfStarted && !this.inHalfTimeBreak) {
+        this.publishClock(ev.matchMinute, 'firstHalf', ev.displayMinute);
+      }
+    }
+    if (ev.type === 'halfTime') {
+      this.halfTimeEmitted = true;
+      this.inHalfTimeBreak = true;
+      this.frozenMatchMinute = ev.matchMinute;
+      this.halfTimeWhistleMinute = ev.matchMinute;
+      this.halfTimeBreakEndsAt = performance.now() + HT_BREAK_REAL_MS;
+      this.publishClock(ev.matchMinute, 'halfTime', 'HT');
+    }
+    if (ev.scoreAfter) this.state = { ...this.state, score: ev.scoreAfter };
+    if (ev.type === 'fullTime') {
+      // Publish the fullTime phase BEFORE pausing. Symmetric with the
+      // halfTime branch above. Critical for two reasons:
+      //   1. AWS mode: the matchClock subscription that carries phase='fullTime'
+      //      arrives AFTER this event; pause() sets this.paused=true and
+      //      injectClock() then early-returns, so without this line the
+      //      client never sees phase='fullTime' and the post-match outcome
+      //      screen never triggers.
+      //   2. Local mode: removes the race where the bus emits 'event' (FT
+      //      card) and pause's 'clock' (still phase='secondHalf') before
+      //      the next publishClock catches up.
+      this.publishClock(ev.matchMinute, 'fullTime', ev.displayMinute || 'FT');
+      this.bus.emit('end', { finalScore: ev.scoreAfter ?? this.state.score });
+      this.pause();
+    }
+  }
+
+  private drainDueEvents(matchMinute: number): void {
+    while (this.cursor < this.events.length) {
+      const ev = this.events[this.cursor];
+      if (ev.matchMinute > matchMinute) break;
+      if (this.shouldDeferEvent(ev)) break;
+      this.cursor += 1;
+      this.applyEventDelivery(ev);
+      if (ev.type === 'fullTime') return;
+    }
+  }
 
   private derivePhase(matchMinute: number): MatchClockState['phase'] {
-    // Use the last emitted event's phase as authoritative for HT/FT, since
-    // those are explicit FinalWhistle events — but during simulation we may
-    // be between events. Approximate from matchMinute when no signal yet.
-    const lastEvent = this.events[this.cursor - 1];
-    if (lastEvent) {
-      if (lastEvent.type === 'fullTime') return 'fullTime';
-      if (lastEvent.type === 'halfTime') return 'halfTime';
-      if (lastEvent.matchPhase === 'secondHalf') return 'secondHalf';
-      if (lastEvent.matchPhase === 'firstHalf') return 'firstHalf';
+    if (this.secondHalfStarted) {
+      const lastEvent = this.events[this.cursor - 1];
+      if (lastEvent?.type === 'fullTime') return 'fullTime';
+      return 'secondHalf';
     }
+    if (this.inHalfTimeBreak) return 'halfTime';
     if (matchMinute < 0.05) return 'preMatch';
-    if (matchMinute < 45) return 'firstHalf';
-    if (matchMinute < 46) return 'halfTime';
-    return 'secondHalf';
+    return 'firstHalf';
   }
 
   private formatClock(matchMinute: number, phase: MatchClockState['phase']): string {
-    if (phase === 'halfTime') return 'HT';
     if (phase === 'fullTime') return 'FT';
-    const minute = Math.floor(matchMinute);
-    if (phase === 'firstHalf' && minute >= 45) return `45+${minute - 45}'`;
-    if (phase === 'secondHalf' && minute >= 90) return `90+${minute - 90}'`;
-    return `${minute}'`;
+    if (this.secondHalfStarted) {
+      return formatDisplayClock(matchMinute, 'secondHalf');
+    }
+    if (this.inHalfTimeBreak) return 'HT';
+    if (matchMinute >= 45) return this.lastStoppageDisplay;
+    return formatDisplayClock(matchMinute, phase);
   }
 }
 

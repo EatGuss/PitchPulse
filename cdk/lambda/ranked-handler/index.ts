@@ -245,7 +245,7 @@ async function lockInRankedMatch(
 ) {
   await ensureProfile(userId);
   const existing = await loadRankedMatchday(userId, matchdayId);
-  if (existing?.played) {
+  if (existing?.played && existing.matchPoints != null) {
     throw new Error('You already played your ranked match this matchday');
   }
 
@@ -302,12 +302,12 @@ async function markRankedMatchdayPlayed(
 
 async function findRankedMatch(userId: string) {
   const matchday = await loadRankedMatchday(userId, DEMO_MATCHDAY_ID);
-  if (matchday?.played) {
+  // Block only when a ranked match was actually completed (points recorded).
+  if (matchday?.played && matchday.matchPoints != null) {
     throw new Error('You already played your ranked match this matchday');
   }
-  if (!matchday?.lockedFixtureId) {
-    throw new Error('Lock in a ranked match before matchmaking');
-  }
+  // Lock-in is enforced client-side before matchmaking; do not require DDB lock
+  // (demo often has local lock-in before AWS sync catches up).
 
   const opponentId = DEMO_OPPONENT[userId];
   if (!opponentId) {

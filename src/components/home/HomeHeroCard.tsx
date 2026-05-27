@@ -97,6 +97,19 @@ export function HomeHeroCard({
     );
   }
 
+  if (state === 'ranked_skipped') {
+    const label = rankedStatus.lockedFixtureLabel ?? 'Your match';
+    return (
+      <section className="hhero hhero--skipped" aria-label="Ranked match not played">
+        <p className="hhero__eyebrow">MATCHDAY {DEMO_MATCHDAY_NUMBER}</p>
+        <h2 className="hhero__title">{label} finished</h2>
+        <p className="hhero__sub">
+          You locked in but didn&apos;t play ranked. Lock in again next matchday.
+        </p>
+      </section>
+    );
+  }
+
   if (state === 'live_played') {
     return (
       <section className="hhero hhero--played" aria-label="Ranked match played">

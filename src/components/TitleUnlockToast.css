@@ -5,60 +5,152 @@
   left: 12px;
   z-index: 26;
   display: flex;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(11, 15, 31, 0.96);
-  border: 1px solid rgba(225, 14, 31, 0.45);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(11, 15, 31, 0.98), rgba(20, 12, 8, 0.98));
+  border: 1px solid rgba(255, 120, 48, 0.45);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(255, 120, 48, 0.18);
+}
+
+.tunlock-toast::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 180, 80, 0.08) 45%,
+    transparent 70%
+  );
+  animation: tunlock-shine 2.4s ease-in-out infinite;
   pointer-events: none;
 }
 
 .tunlock-toast.is-entering {
-  animation: tunlock-in 280ms ease-out forwards;
+  animation: tunlock-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .tunlock-toast.is-leaving {
-  animation: tunlock-out 280ms ease-in forwards;
+  animation: tunlock-leave 320ms ease-in forwards;
 }
 
-@keyframes tunlock-in {
+@keyframes tunlock-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tunlock-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+}
+
+@keyframes tunlock-shine {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translateX(-30%);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(30%);
+  }
+}
+
+.tunlock-toast__badge {
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 180, 100, 0.35);
+  background: linear-gradient(145deg, rgba(255, 120, 48, 0.28), rgba(255, 60, 90, 0.12));
+  box-shadow: 0 0 20px rgba(255, 120, 48, 0.35);
+  animation:
+    tunlock-badge-in 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    tunlock-badge-pulse 1.2s ease 700ms infinite alternate;
+}
+
+@keyframes tunlock-badge-in {
+  0% {
+    transform: rotate(-100deg) scale(0.35);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes tunlock-badge-pulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(255, 120, 48, 0.35);
+  }
+  to {
+    transform: scale(1.08);
+    box-shadow: 0 0 28px rgba(255, 160, 80, 0.55);
+  }
+}
+
+.tunlock-toast__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  animation: tunlock-copy-in 600ms ease 280ms both;
+}
+
+@keyframes tunlock-copy-in {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-@keyframes tunlock-out {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-
-.tunlock-toast__icon {
-  font-size: 22px;
-  line-height: 1;
 }
 
 .tunlock-toast__cat {
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #e10e1f;
-  font-weight: 600;
+  color: #ffb347;
+  font-weight: 700;
 }
 
 .tunlock-toast__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #f5f7fa;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff8f0;
+  line-height: 1.2;
+}
+
+.tunlock-toast__sub {
+  font-size: 11px;
+  color: rgba(255, 220, 180, 0.75);
+  line-height: 1.3;
 }

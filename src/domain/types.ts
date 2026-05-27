@@ -23,6 +23,12 @@ export type NormalizedEventType =
 
 export type MatchPhase = 'preMatch' | 'firstHalf' | 'halfTime' | 'secondHalf' | 'fullTime';
 
+/** 2H kick-off minute — after 1H stoppage (45+*) and HT; displays as 46'. */
+export const SECOND_HALF_START_MINUTE = 46;
+
+/** Distinguishes match/period start vs goal restart kick-offs in the feed. */
+export type KickOffRole = 'firstHalfStart' | 'secondHalfStart' | 'restart';
+
 export interface NormalizedEvent {
   id: string;
   type: NormalizedEventType;
@@ -30,12 +36,16 @@ export interface NormalizedEvent {
   displayMinute: string;
   matchPhase: MatchPhase;
   eventTimeIso: string;
+  /** Set on kickOff events — only `secondHalfStart` is the post-HT period opener. */
+  kickOffRole?: KickOffRole;
   teamId?: string;
   playerId?: string;
   assistPlayerId?: string;
   cardColor?: 'yellow' | 'yellowRed' | 'red';
   reason?: string;
   scoreAfter?: { home: number; guest: number };
+  /** Shown on the board for stoppageTimeAnnounced (e.g. +2 → 45+1, 45+2). */
+  stoppageMinutes?: number;
 }
 
 export interface PlayerLite {

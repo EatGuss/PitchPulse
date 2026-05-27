@@ -81,7 +81,8 @@
   color: var(--pp-success);
   line-height: 1;
 }
-.hhero--closed {
+.hhero--closed,
+.hhero--skipped {
   border-color: rgba(255, 255, 255, 0.08);
 }
 .hhero__matches {

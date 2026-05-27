@@ -17,17 +17,32 @@ import './Leaderboard.css';
 const formatter = new Intl.NumberFormat('en-US');
 const MEDALS = ['🥇', '🥈', '🥉'];
 
+export type LeaderboardBoardVariant = 'ranked' | 'watchRoom' | 'live';
+
+const BOARD_LABELS: Record<LeaderboardBoardVariant, string> = {
+  ranked: 'Ranked board',
+  watchRoom: 'Watch room board',
+  live: 'Live board',
+};
+
 export interface LeaderboardProps {
   viewerId: string;
+  variant: LeaderboardBoardVariant;
+  /** When set, only these users appear on the board (ranked 1v1 or watch room members). */
+  memberIds?: string[];
 }
 
-export function Leaderboard({ viewerId }: LeaderboardProps) {
-  const rows = useLeaderboard();
+export function Leaderboard({ viewerId, variant, memberIds }: LeaderboardProps) {
+  const allRows = useLeaderboard();
+  const allowed = memberIds ? new Set(memberIds) : null;
+  const filtered = allowed ? allRows.filter((r) => allowed.has(r.userId)) : allRows;
+  const rows = filtered.map((r, i) => ({ ...r, rank: i + 1 }));
+  const label = BOARD_LABELS[variant];
 
   return (
-    <section className="lb" aria-label="Live leaderboard">
+    <section className="lb" aria-label={label}>
       <div className="lb__header">
-        <span className="lb__title">Watch room board</span>
+        <span className="lb__title">{label}</span>
         <span className="lb__hint">Live · {rows.length} fans</span>
       </div>
       <ol className="lb__list" aria-live="polite">

@@ -16,9 +16,7 @@ import { Leaderboard } from '../components/Leaderboard';
 import { RoomMemberSidebar } from '../components/RoomMemberSidebar';
 import { ReactionBar } from '../components/ReactionBar';
 import { ReactionStream } from '../components/ReactionStream';
-import { BadgeToast } from '../components/BadgeToast';
 import { TitleUnlockToast } from '../components/TitleUnlockToast';
-import { HalfTimeTrivia } from '../components/trivia/HalfTimeTrivia';
 import { useMatchData } from '../hooks/useMatchData';
 import { useMatchSimState } from '../hooks/useMatchSimState';
 import { useActivePrompt } from '../hooks/useActivePrompt';
@@ -145,7 +143,17 @@ export function MatchPage({
             </div>
           )}
           <MatchHeader info={info} clock={clock} />
-          {!inWatchRoom && <Leaderboard viewerId={userId} />}
+          <Leaderboard
+            viewerId={userId}
+            variant={inRanked ? 'ranked' : inWatchRoom ? 'watchRoom' : 'live'}
+            memberIds={
+              inRanked && rankedOpponent
+                ? [userId, rankedOpponent.opponentId]
+                : inWatchRoom && memberIds
+                  ? memberIds
+                  : undefined
+            }
+          />
           <EventFeed events={events} info={info} viewerId={userId} />
           <div className="mpage__dock-wrap">
             {!inRanked && (
@@ -187,9 +195,7 @@ export function MatchPage({
         onHotTakeChange={inRanked ? setHotTakeOn : undefined}
         rivalHotTakeActive={inRanked && !!prompt && rivalHotTakePromptId === prompt.id}
       />
-      <BadgeToast viewerId={userId} />
       {inRanked ? <TitleUnlockToast viewerId={userId} /> : null}
-      <HalfTimeTrivia viewerId={userId} />
     </div>
   );
 }

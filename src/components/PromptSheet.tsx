@@ -221,53 +221,31 @@ export function PromptSheet({
   const canCollapse =
     prompt.state === 'open' || prompt.state === 'locked' || (prompt.state === 'resolved' && satOut);
 
-  // ── Collapsed view: thin pill at the bottom, lets the event feed breathe.
-  if (visible && collapsed && canCollapse) {
-    const miniLabel =
-      prompt.state === 'resolved'
-        ? 'RESULT'
-        : pickedOption && prompt.state === 'open'
-          ? 'YOUR PICK · LIVE'
-          : pickedOption && prompt.state === 'locked'
-            ? 'YOUR PICK · LOCKED'
-            : prompt.state === 'open'
-              ? 'LIVE PROMPT'
-              : 'PROMPT · LOCKED';
-    const miniDetail =
-      prompt.state === 'resolved'
-        ? 'You sat this one out'
-        : pickedOption?.label ?? prompt.copy;
-
-    return (
-      <div className="ps ps--collapsed is-visible" role="region" aria-label="Active prediction (collapsed)">
-        <button
-          type="button"
-          className="ps-mini"
-          onClick={() => setCollapsed(false)}
-          aria-label="Expand prediction"
-        >
-          <span className="ps-mini__state" data-state={prompt.state} aria-hidden="true" />
-          <span className="ps-mini__txt">
-            <span className="ps-mini__label">{miniLabel}</span>
-            <span className="ps-mini__option">{miniDetail}</span>
-          </span>
-          {prompt.state === 'open' ? (
-            <span className="ps-mini__timer tabular" aria-label={`${Math.ceil(secondsLeft)} seconds left`}>
-              {Math.max(0, Math.ceil(secondsLeft))}s
-            </span>
-          ) : prompt.state === 'locked' ? (
-            <span className="ps-mini__timer" aria-hidden="true">🔒</span>
-          ) : null}
-          <span className="ps-mini__chev" aria-hidden="true">↑</span>
-        </button>
-      </div>
-    );
-  }
+  const showCollapsedMini = visible && collapsed && canCollapse;
+  const miniLabel =
+    prompt.state === 'resolved'
+      ? 'RESULT'
+      : pickedOption && prompt.state === 'open'
+        ? 'YOUR PICK · LIVE'
+        : pickedOption && prompt.state === 'locked'
+          ? 'YOUR PICK · LOCKED'
+          : prompt.state === 'open'
+            ? 'LIVE PROMPT'
+            : 'PROMPT · LOCKED';
+  const miniDetail =
+    prompt.state === 'resolved'
+      ? 'You sat this one out'
+      : pickedOption?.label ?? prompt.copy;
 
   return (
-    <div className={`ps ${visible ? 'is-visible' : 'is-leaving'}`} role="dialog" aria-modal="true" aria-label="Live prediction">
+    <div
+      className={`ps ${visible ? 'is-visible' : 'is-leaving'} ${showCollapsedMini ? 'ps--collapsed' : ''}`}
+      role="dialog"
+      aria-modal={!showCollapsedMini}
+      aria-label="Live prediction"
+    >
       <div className="ps__backdrop" aria-hidden="true" />
-      <div className="ps__panel">
+      <div className={`ps__panel ${showCollapsedMini ? 'ps__panel--hidden' : ''}`}>
         <div className="ps__handle" aria-hidden="true" />
 
         <div className="ps__top">
@@ -358,6 +336,7 @@ export function PromptSheet({
             remaining={hotTakeRemaining}
             enabled={hotTakeOn}
             onChange={onHotTakeChange}
+            disabled={rivalHotTakeActive}
           />
         )}
 
@@ -443,6 +422,28 @@ export function PromptSheet({
           </p>
         )}
       </div>
+      {showCollapsedMini && (
+        <button
+          type="button"
+          className="ps-mini"
+          onClick={() => setCollapsed(false)}
+          aria-label="Expand prediction"
+        >
+          <span className="ps-mini__state" data-state={prompt.state} aria-hidden="true" />
+          <span className="ps-mini__txt">
+            <span className="ps-mini__label">{miniLabel}</span>
+            <span className="ps-mini__option">{miniDetail}</span>
+          </span>
+          {prompt.state === 'open' ? (
+            <span className="ps-mini__timer tabular" aria-label={`${Math.ceil(secondsLeft)} seconds left`}>
+              {Math.max(0, Math.ceil(secondsLeft))}s
+            </span>
+          ) : prompt.state === 'locked' ? (
+            <span className="ps-mini__timer" aria-hidden="true">🔒</span>
+          ) : null}
+          <span className="ps-mini__chev" aria-hidden="true">↑</span>
+        </button>
+      )}
     </div>
   );
 }

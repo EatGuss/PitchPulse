@@ -36,10 +36,31 @@ export function summarizeEvent(event: NormalizedEvent, info: MatchInfo): EventSu
       };
     }
     case 'kickOff':
+      if (event.kickOffRole === 'secondHalfStart') {
+        return {
+          id: event.id,
+          headline: `KICK OFF — ${minute}`,
+          subline: 'After half time',
+        };
+      }
+      if (event.kickOffRole === 'restart') {
+        return {
+          id: event.id,
+          headline: `RESTART — ${minute}`,
+          subline: 'Play resumes',
+        };
+      }
+      if (event.kickOffRole === 'firstHalfStart') {
+        return {
+          id: event.id,
+          headline: `KICK OFF — ${minute}`,
+          subline: `${info.teams.home.xmlShortName} v ${info.teams.guest.xmlShortName}`,
+        };
+      }
       return {
         id: event.id,
-        headline: `KICKOFF — ${minute}`,
-        subline: `${info.teams.home.xmlShortName} v ${info.teams.guest.xmlShortName}`,
+        headline: `KICK OFF — ${minute}`,
+        subline: 'Play resumes',
       };
     case 'halfTime':
       return {

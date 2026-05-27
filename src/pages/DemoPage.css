@@ -65,39 +65,5 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
   min-width: 280px;
-}
-
-.demo__pillars {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 320px;
-}
-.demo__pillar {
-  padding: 12px 16px;
-  background: var(--pp-surface);
-  border: 1px solid var(--pp-border);
-  border-radius: var(--pp-r-md);
-}
-.demo__pillar-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: var(--pp-accent);
-  text-transform: uppercase;
-}
-.demo__pillar-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--pp-text);
-  margin-top: 2px;
-}
-.demo__pillar-desc {
-  font-size: 11px;
-  color: var(--pp-text-muted);
-  margin-top: 2px;
-  line-height: 1.4;
 }

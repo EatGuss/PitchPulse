@@ -8,11 +8,7 @@ import type { RankedMatchResult } from '../domain/rankedTypes';
 import { isAwsMode } from './config';
 import { COMPLETE_RANKED_MATCH } from './operations';
 import type { RankedMatchTitleInput } from '../domain/rankedMatchStats';
-import {
-  localCompleteRankedDrawMatch,
-  localCompleteRankedMatch,
-  localSyncRankedMatchResult,
-} from '../sim/localProfileStore';
+import { localCompleteRankedDrawMatch, localCompleteRankedMatch } from '../sim/localProfileStore';
 import { finalizeRankedDrawMatchTitles, finalizeRankedMatchTitles } from '../sim/titleUnlockEngine';
 
 interface CompleteRankedMatchResponse {
@@ -64,13 +60,18 @@ export async function commitCompleteRankedMatch(
     const raw = res.data?.completeRankedMatch;
     if (!raw) throw new Error('completeRankedMatch returned no data');
 
+    // Demo profiles use local seed tier (Alice Silver 4/5); DynamoDB may be stale.
+    const localResult = isDraw
+      ? localCompleteRankedDrawMatch(matchId, winnerId, loserId)
+      : localCompleteRankedMatch(matchId, winnerId, loserId);
+
     const result: RankedMatchResult = {
       ...raw,
-      isDraw: raw.isDraw ?? isDraw,
-      outcome: raw.outcome ?? (isDraw ? 'DRAW' : null),
+      ...localResult,
+      isDraw: localResult.isDraw ?? isDraw,
+      outcome: localResult.outcome ?? (isDraw ? 'DRAW' : null),
     };
 
-    localSyncRankedMatchResult(winnerId, loserId, result);
     return result;
   } catch (err) {
     console.warn('[ranked] completeRankedMatch failed — using local tier logic', err);

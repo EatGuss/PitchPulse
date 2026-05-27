@@ -70,6 +70,8 @@ export function RankedFlow({
   const [preMatchSnapshot, setPreMatchSnapshot] = useState<PreMatchSnapshot | null>(null);
   const [tierState, setTierState] = useState(() => localGetTierProgress(userId));
   const settledRef = useRef(false);
+  /** Phase when ranked live match began — skip auto-settle if already full time at start. */
+  const rankedStartedAtPhaseRef = useRef<typeof clock.phase | null>(null);
 
   const atFullTime = clock.phase === 'fullTime';
 
@@ -90,6 +92,10 @@ export function RankedFlow({
 
   useEffect(() => {
     if (!opponent || !atFullTime || settledRef.current) return;
+    if (rankedStartedAtPhaseRef.current === 'fullTime') {
+      settledRef.current = true;
+      return;
+    }
     settledRef.current = true;
 
     const oppPoints = getPromptEngine().getUser(opponent.opponentId)?.matchPoints ?? 0;
@@ -135,13 +141,19 @@ export function RankedFlow({
   }, [atFullTime, matchPoints, opponent, recordPlay, userId]);
 
   useEffect(() => {
-    if (opponent && atFullTime && postMatchPhase === null) {
+    if (
+      opponent &&
+      atFullTime &&
+      postMatchPhase === null &&
+      rankedStartedAtPhaseRef.current !== 'fullTime'
+    ) {
       setPostMatchPhase('outcome');
     }
   }, [atFullTime, opponent, postMatchPhase]);
 
   const handleMatchStart = useCallback(
     (found: RankedOpponent) => {
+      rankedStartedAtPhaseRef.current = clock.phase;
       const stats = localGetUserStats(userId);
       const tierProgress = localGetTierProgress(userId);
       setPreMatchSnapshot({
@@ -154,7 +166,7 @@ export function RankedFlow({
       setOpponent(found);
       onLiveMatchChange?.(true);
     },
-    [onLiveMatchChange, userId],
+    [clock.phase, onLiveMatchChange, userId],
   );
 
   const handleOutcomeDismiss = useCallback(() => {

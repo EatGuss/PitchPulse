@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_SIM_SECONDS_PER_MATCH_MINUTE?: string;
+  readonly VITE_HT_BREAK_MS?: string;
   readonly VITE_PROMPT_WINDOW_MS?: string;
   readonly VITE_APPSYNC_URL?: string;
   readonly VITE_APPSYNC_REGION?: string;

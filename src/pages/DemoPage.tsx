@@ -4,15 +4,24 @@
  * Each phone: onboarding → 4-tab AppShell (Home default).
  */
 
+import { useEffect, useRef } from 'react';
 import { PhoneFrame } from '../components/PhoneFrame';
 import { SimControls } from '../components/SimControls';
 import { DataDisclosure } from '../components/DataDisclosure';
 import { PhoneEntryFlow } from './PhoneEntryFlow';
 import { DEMO_USERS } from '../data/personas';
 import { teamAlias } from '../data/teamAliases';
+import { resetRankedMatchdayPlay } from '../sim/matchdayStore';
 import './DemoPage.css';
 
 export function DemoPage() {
+  const bootstrapped = useRef(false);
+
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    resetRankedMatchdayPlay();
+  }, []);
   const alice = DEMO_USERS.alice;
   const bob = DEMO_USERS.bob;
   const aliceTeam = teamAlias(alice.favoriteTeamId);
@@ -39,23 +48,6 @@ export function DemoPage() {
 
         <div className="demo__bridge">
           <SimControls variant="demo" />
-          <div className="demo__pillars">
-            <div className="demo__pillar">
-              <div className="demo__pillar-label">PILLAR 1</div>
-              <div className="demo__pillar-name">Multiplayer</div>
-              <div className="demo__pillar-desc">Two fans · shared room · live reactions</div>
-            </div>
-            <div className="demo__pillar">
-              <div className="demo__pillar-label">PILLAR 2</div>
-              <div className="demo__pillar-name">Real-time data</div>
-              <div className="demo__pillar-desc">XML replay · goal · card · half-time</div>
-            </div>
-            <div className="demo__pillar">
-              <div className="demo__pillar-label">PILLAR 3</div>
-              <div className="demo__pillar-name">Gamification</div>
-              <div className="demo__pillar-desc">PitchPoints · odds × correctness · badges</div>
-            </div>
-          </div>
         </div>
 
         <PhoneFrame label={`${bob.displayName} — ${bobTeam.full} fan`} subLabel={bob.archetypeName}>

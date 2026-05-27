@@ -32,7 +32,9 @@
   will-change: max-height;
 }
 .hupcoming--expanded .hupcoming__list-wrap {
-  max-height: 132px;
+  /* 3 rows (~52px each) + 2 gaps — room for "You · Xp" line on a row */
+  max-height: 220px;
+  padding-bottom: 2px;
 }
 .hupcoming__fade {
   position: absolute;

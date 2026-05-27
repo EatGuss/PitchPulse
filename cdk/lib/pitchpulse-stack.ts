@@ -143,7 +143,10 @@ export class PitchPulseStack extends Stack {
       functionName: 'pp-sim-emitter',
       entry: path.join(CDK_ROOT, 'lambda', 'sim-emitter', 'index.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(60), // > LOOP_MAX_MS (55s) inside the handler
+      // Match at SIM_RATE=30 plays in ~184 real seconds. Lambda loops for up
+      // to LOOP_MAX_MS=220s so a single invocation covers the entire match —
+      // avoids any visible gap between Lambda exits and EventBridge re-fires.
+      timeout: Duration.seconds(240),
       memorySize: 512,
       // Pin to exactly 1 concurrent invocation. Without this, the manual
       // invoke triggered by start-match races the EventBridge 1-minute
@@ -272,23 +275,6 @@ export class PitchPulseStack extends Stack {
     });
     promptsTable.grantReadWriteData(voteHandlerFn);
 
-    const triviaHandlerFn = new lambdaNodejs.NodejsFunction(this, 'TriviaHandlerFn', {
-      ...fnDefaults,
-      functionName: 'pp-trivia-handler',
-      entry: path.join(CDK_ROOT, 'lambda', 'trivia-handler', 'index.ts'),
-      handler: 'handler',
-      timeout: Duration.seconds(60),
-      memorySize: 256,
-      environment: {
-        PROMPTS_TABLE: promptsTable.tableName,
-        MATCHES_TABLE: matchesTable.tableName,
-        MATCH_ID,
-      },
-    });
-    promptsTable.grantReadWriteData(triviaHandlerFn);
-    matchesTable.grantReadData(triviaHandlerFn);
-    triviaHandlerFn.grantInvoke(triviaHandlerFn);
-
     const weeklyResetFn = new lambdaNodejs.NodejsFunction(this, 'WeeklyResetFn', {
       ...fnDefaults,
       functionName: 'pp-weekly-reset',
@@ -343,10 +329,7 @@ export class PitchPulseStack extends Stack {
 
     // Now that the API exists, plumb its URL into server-side broadcast Lambdas.
     streamHandlerFn.addEnvironment('APPSYNC_URL', api.graphqlUrl);
-    streamHandlerFn.addEnvironment('TRIVIA_HANDLER_FN', triviaHandlerFn.functionName);
     rankedHandlerFn.addEnvironment('APPSYNC_URL', api.graphqlUrl);
-    triviaHandlerFn.addEnvironment('APPSYNC_URL', api.graphqlUrl);
-    triviaHandlerFn.grantInvoke(streamHandlerFn);
     // stream-handler is IAM-allowed to invoke just the two publish mutations.
     streamHandlerFn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -354,17 +337,6 @@ export class PitchPulseStack extends Stack {
         resources: [
           `${api.arn}/types/Mutation/fields/publishMatchClock`,
           `${api.arn}/types/Mutation/fields/publishMatchEvent`,
-        ],
-      }),
-    );
-    triviaHandlerFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['appsync:GraphQL'],
-        resources: [
-          `${api.arn}/types/Mutation/fields/publishTriviaStarted`,
-          `${api.arn}/types/Mutation/fields/publishTriviaScoreUpdated`,
-          `${api.arn}/types/Mutation/fields/publishTriviaQuestionClosed`,
-          `${api.arn}/types/Mutation/fields/publishTriviaCompleted`,
         ],
       }),
     );
@@ -390,7 +362,6 @@ export class PitchPulseStack extends Stack {
     const rankedHandlerDS = api.addLambdaDataSource('RankedHandlerDS', rankedHandlerFn);
     const leaderboardHandlerDS = api.addLambdaDataSource('LeaderboardHandlerDS', leaderboardHandlerFn);
     const voteHandlerDS = api.addLambdaDataSource('VoteHandlerDS', voteHandlerFn);
-    const triviaHandlerDS = api.addLambdaDataSource('TriviaHandlerDS', triviaHandlerFn);
 
     // ─── AppSync resolvers ─────────────────────────────────────────────
 
@@ -429,40 +400,6 @@ export class PitchPulseStack extends Stack {
     voteHandlerDS.createResolver('InitRankedHotTakeResolver', {
       typeName: 'Mutation',
       fieldName: 'initRankedHotTake',
-    });
-
-    triviaHandlerDS.createResolver('SubmitTriviaAnswerResolver', {
-      typeName: 'Mutation',
-      fieldName: 'submitTriviaAnswer',
-    });
-    triviaHandlerDS.createResolver('GetHalfTimeTriviaQuestionsResolver', {
-      typeName: 'Query',
-      fieldName: 'getHalfTimeTriviaQuestions',
-    });
-
-    noneDS.createResolver('PublishTriviaStartedResolver', {
-      typeName: 'Mutation',
-      fieldName: 'publishTriviaStarted',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishTriviaStarted.js')),
-    });
-    noneDS.createResolver('PublishTriviaScoreUpdatedResolver', {
-      typeName: 'Mutation',
-      fieldName: 'publishTriviaScoreUpdated',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishTriviaScoreUpdated.js')),
-    });
-    noneDS.createResolver('PublishTriviaQuestionClosedResolver', {
-      typeName: 'Mutation',
-      fieldName: 'publishTriviaQuestionClosed',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishTriviaQuestionClosed.js')),
-    });
-    noneDS.createResolver('PublishTriviaCompletedResolver', {
-      typeName: 'Mutation',
-      fieldName: 'publishTriviaCompleted',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishTriviaCompleted.js')),
     });
 
     // Lambda data sources don't use JS resolvers — they wire mutation args
@@ -628,13 +565,11 @@ export class PitchPulseStack extends Stack {
           `${api.arn}/types/Mutation/fields/equipTitle`,
           `${api.arn}/types/Mutation/fields/unlockHotTakeHero`,
           `${api.arn}/types/Mutation/fields/completeRankedMatch`,
-          `${api.arn}/types/Mutation/fields/submitTriviaAnswer`,
           // Client-receivable queries (Gate B)
           `${api.arn}/types/Query/fields/weeklyLeaderboard`,
           `${api.arn}/types/Query/fields/seasonalLeaderboard`,
           `${api.arn}/types/Query/fields/userStats`,
           `${api.arn}/types/Query/fields/rankedMatchdayStatus`,
-          `${api.arn}/types/Query/fields/getHalfTimeTriviaQuestions`,
           // Client-receivable subscriptions
           `${api.arn}/types/Subscription/fields/matchClock`,
           `${api.arn}/types/Subscription/fields/matchEvent`,
@@ -647,10 +582,6 @@ export class PitchPulseStack extends Stack {
           `${api.arn}/types/Subscription/fields/titleUnlocked`,
           `${api.arn}/types/Subscription/fields/rivalHotTakeSignal`,
           `${api.arn}/types/Subscription/fields/leaderboardUpdated`,
-          `${api.arn}/types/Subscription/fields/triviaStarted`,
-          `${api.arn}/types/Subscription/fields/triviaScoreUpdated`,
-          `${api.arn}/types/Subscription/fields/triviaQuestionClosed`,
-          `${api.arn}/types/Subscription/fields/triviaCompleted`,
           // Schema sanity check
           `${api.arn}/types/Query/fields/ping`,
         ],

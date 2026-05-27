@@ -55,6 +55,8 @@ function envHeroOverride(): MatchdayHeroState | null {
       return 'live_not_played';
     case 'played':
       return 'live_played';
+    case 'skipped':
+      return 'ranked_skipped';
     case 'complete':
       return 'post_matchday';
     default:
@@ -206,6 +208,7 @@ export function resolveHeroState(
     const selectedPhase = fixtureSchedulePhase(lockedId, clockPhase, isRunning, simKickoffWallMs);
     if (selectedPhase === 'live') return 'live_not_played';
     if (selectedPhase === 'soon') return 'locked_in';
+    if (!userStatus.played) return 'ranked_skipped';
     return 'post_matchday';
   }
 

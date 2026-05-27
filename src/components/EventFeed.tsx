@@ -1,8 +1,8 @@
 /**
  * EventFeed — scrolling live feed of normalized match events.
  *
- * Subscribes to MatchSim via the shared bus and prepends new events at the top
- * (chronological-newest-first, like a real match ticker). For Gate 1 we render
+ * Subscribes to MatchSim via the shared bus; newest events appear at the top.
+ * For Gate 1 we render
  * the three MVP event types (goal, card, halfTime) plus fullTime; other types
  * are accepted by the bus but filtered here.
  */
@@ -49,6 +49,19 @@ const DISPLAYABLE = new Set<DisplayableType>([
 
 function isDisplayable(t: NormalizedEvent['type']): t is DisplayableType {
   return DISPLAYABLE.has(t as DisplayableType);
+}
+
+/** Newest match minute first; stable tie-break at the HT → 2H boundary. */
+function compareFeedOrder(a: NormalizedEvent, b: NormalizedEvent): number {
+  const d = b.matchMinute - a.matchMinute;
+  if (Math.abs(d) > 0.0001) return d;
+  const rank = (e: NormalizedEvent): number => {
+    if (e.kickOffRole === 'secondHalfStart') return 0;
+    if (e.type === 'halfTime') return 1;
+    if (e.type === 'stoppageTimeAnnounced') return 2;
+    return 3;
+  };
+  return rank(a) - rank(b);
 }
 
 const FOUL_TYPE_LABEL: Record<string, string> = {
@@ -153,8 +166,21 @@ function FeedRow({ event, info, viewerId }: RowProps) {
           <span className="feed__time tabular">{event.displayMinute}</span>
           <span className="feed__icon" aria-hidden="true">▶</span>
           <div className="feed__body">
-            <div className="feed__title">Kick-off</div>
-            <div className="feed__sub">{event.matchPhase === 'secondHalf' ? 'Second half underway' : 'Match underway'}</div>
+            <div className="feed__title">
+              {event.kickOffRole === 'firstHalfStart' ||
+              event.kickOffRole === 'secondHalfStart' ||
+              (event.matchMinute < 0.05 && event.matchPhase === 'firstHalf')
+                ? 'Kick off'
+                : 'Restart'}
+            </div>
+            <div className="feed__sub">
+              {event.kickOffRole === 'secondHalfStart'
+                ? 'After half time'
+                : event.kickOffRole === 'firstHalfStart' ||
+                    (event.matchMinute < 0.05 && event.matchPhase === 'firstHalf')
+                  ? 'Match underway'
+                  : 'Play resumes'}
+            </div>
           </div>
         </li>
       );
@@ -253,7 +279,7 @@ function FeedRow({ event, info, viewerId }: RowProps) {
 export function EventFeed({ events, info, viewerId }: EventFeedProps) {
   // Only render the headline event types in MVP — others are still in the
   // bus and the underlying log, but the feed itself stays uncluttered.
-  const visible = events.filter((e) => isDisplayable(e.type)).slice().reverse();
+  const visible = events.filter((e) => isDisplayable(e.type)).slice().sort(compareFeedOrder);
   const listRef = useRef<HTMLUListElement>(null);
   const [flash, setFlash] = useState<string | null>(null);
 

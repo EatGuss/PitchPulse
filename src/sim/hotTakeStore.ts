@@ -20,7 +20,14 @@ interface HotTakeRow {
 }
 
 const byMatchUser = new Map<string, HotTakeRow>();
-const bus = new TypedEventBus<{ changed: undefined; signaled: HotTakeSignal }>();
+/** At most one Hot Take per prompt per match (1v1 duel). */
+const promptClaimByMatch = new Map<string, string>();
+const bus = new TypedEventBus<{
+  changed: undefined;
+  signaled: HotTakeSignal;
+  promptClaimed: { matchId: string; promptId: string; userId: string };
+  promptClaimReleased: { matchId: string; promptId: string };
+}>();
 
 function key(matchId: string, userId: string): string {
   return `${matchId}#${userId}`;
@@ -33,7 +40,53 @@ export function initRankedHotTakeState(matchId: string, userId: string): void {
 
 export function resetHotTakeState(): void {
   byMatchUser.clear();
+  promptClaimByMatch.clear();
   bus.emit('changed', undefined);
+}
+
+function promptClaimKey(matchId: string, promptId: string): string {
+  return `${matchId}#${promptId}`;
+}
+
+export function getPromptHotTakeClaim(matchId: string, promptId: string): string | null {
+  return promptClaimByMatch.get(promptClaimKey(matchId, promptId)) ?? null;
+}
+
+/** Claim Hot Take for this prompt. Returns false if rival already claimed. */
+export function claimPromptHotTake(matchId: string, promptId: string, userId: string): boolean {
+  const key = promptClaimKey(matchId, promptId);
+  const holder = promptClaimByMatch.get(key);
+  if (holder && holder !== userId) return false;
+  if (holder === userId) return true;
+  promptClaimByMatch.set(key, userId);
+  bus.emit('promptClaimed', { matchId, promptId, userId });
+  return true;
+}
+
+export function releasePromptHotTake(matchId: string, promptId: string, userId: string): void {
+  const key = promptClaimKey(matchId, promptId);
+  if (promptClaimByMatch.get(key) !== userId) return;
+  promptClaimByMatch.delete(key);
+  bus.emit('promptClaimReleased', { matchId, promptId });
+}
+
+export function clearPromptHotTakeClaim(matchId: string, promptId: string): void {
+  const key = promptClaimKey(matchId, promptId);
+  if (!promptClaimByMatch.has(key)) return;
+  promptClaimByMatch.delete(key);
+  bus.emit('promptClaimReleased', { matchId, promptId });
+}
+
+export function subscribePromptHotTakeClaim(
+  onClaim: (payload: { matchId: string; promptId: string; userId: string }) => void,
+): () => void {
+  return bus.on('promptClaimed', onClaim);
+}
+
+export function subscribePromptHotTakeClaimReleased(
+  onRelease: (payload: { matchId: string; promptId: string }) => void,
+): () => void {
+  return bus.on('promptClaimReleased', onRelease);
 }
 
 export function getRemainingHotTakes(matchId: string, userId: string): number {

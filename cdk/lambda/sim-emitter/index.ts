@@ -10,7 +10,7 @@
  * Per-invocation behaviour:
  *   - Cold start: read the two XMLs from S3, parse into a normalized event
  *     stream, cache in module scope (reused on subsequent warm invocations).
- *   - Loop until ~55 seconds elapsed OR match becomes idle:
+ *   - Loop until ~220 seconds elapsed OR match becomes idle:
  *       1. Read CLOCK from pp-matches
  *       2. If !isRunning or phase=fullTime → return (no work)
  *       3. Compute current match-minute from elapsed wall-time × SIM_RATE
@@ -18,10 +18,12 @@
  *       5. Update the CLOCK item
  *       6. Sleep 2 real-seconds, repeat
  *
- * Why a loop inside the Lambda: EventBridge schedule rules can't fire faster
- * than once per minute. The brief calls for 2-second match-tick granularity,
- * so the Lambda itself runs the 2-second cadence and exits before the next
- * cron tick — at which point another invocation takes over seamlessly.
+ * Why such a long loop: a 90' match at SIM_RATE=30 (1 match-min = 2 real-sec)
+ * plays in ~184 real seconds. Running for the full match in one invocation
+ * avoids the 0–60s gap that would otherwise sit between the Lambda exiting
+ * and EventBridge re-firing — the user would see cards stop appearing during
+ * that window. EventBridge's rate(1 minute) rule stays in place as a recovery
+ * net: if the loop dies mid-match it will resume on the next cron tick.
  *
  * All writes hit pp-matches, which has DynamoDB Streams enabled. The
  * stream-handler Lambda picks up each write and broadcasts via the
@@ -38,7 +40,14 @@ import {
   BatchWriteItemCommand,
   type AttributeValue,
 } from '@aws-sdk/client-dynamodb';
-import { parseMatchXmlBundle, type NormalizedEvent, type MatchPhase, type ParsedMatch } from './parser';
+import {
+  formatDisplayClock,
+  parseMatchXmlBundle,
+  SECOND_HALF_START_MINUTE,
+  type NormalizedEvent,
+  type MatchPhase,
+  type ParsedMatch,
+} from './parser';
 
 // ─── Config (from env) ─────────────────────────────────────────────────────
 
@@ -102,6 +111,8 @@ interface ClockState {
   scoreGuest: number;
   lastEmittedSeq: number;
   updatedAt: number;
+  /** Wall ms when the HT break ends and 2H resumes at 46'. */
+  htBreakEndsAt?: number;
 }
 
 function emptyClock(): ClockState {
@@ -141,6 +152,9 @@ async function readClock(): Promise<ClockState> {
     scoreGuest: Number(res.Item['scoreGuest']?.N ?? 0),
     lastEmittedSeq: Number(res.Item['lastEmittedSeq']?.N ?? -1),
     updatedAt: Number(res.Item['updatedAt']?.N ?? 0),
+    htBreakEndsAt: res.Item['htBreakEndsAt']?.N
+      ? Number(res.Item['htBreakEndsAt'].N)
+      : undefined,
   };
 }
 
@@ -158,6 +172,9 @@ function clockToItem(c: ClockState): Record<string, AttributeValue> {
     scoreGuest: { N: String(c.scoreGuest) },
     lastEmittedSeq: { N: String(c.lastEmittedSeq) },
     updatedAt: { N: String(c.updatedAt) },
+    ...(c.htBreakEndsAt !== undefined
+      ? { htBreakEndsAt: { N: String(c.htBreakEndsAt) } }
+      : {}),
   };
 }
 
@@ -195,29 +212,64 @@ function eventToItem(seq: number, ev: NormalizedEvent): Record<string, Attribute
 
 // ─── Phase + clock display ─────────────────────────────────────────────────
 
-function derivePhase(matchMinute: number, lastEvent: NormalizedEvent | undefined): MatchPhase {
-  if (lastEvent) {
-    if (lastEvent.type === 'fullTime') return 'fullTime';
-    if (lastEvent.type === 'halfTime') return 'halfTime';
-    if (lastEvent.matchPhase === 'secondHalf') return 'secondHalf';
-    if (lastEvent.matchPhase === 'firstHalf') return 'firstHalf';
-  }
+function derivePhase(
+  matchMinute: number,
+  lastEvent: NormalizedEvent | undefined,
+  secondHalfStarted: boolean,
+  inHalfTimeBreak: boolean,
+): MatchPhase {
+  if (lastEvent?.type === 'fullTime') return 'fullTime';
+  if (secondHalfStarted) return 'secondHalf';
+  if (inHalfTimeBreak) return 'halfTime';
   if (matchMinute < 0.05) return 'preMatch';
-  if (matchMinute < 45) return 'firstHalf';
-  if (matchMinute < 46) return 'halfTime';
-  return 'secondHalf';
+  return 'firstHalf';
 }
 
-function formatClock(matchMinute: number, phase: MatchPhase): string {
-  if (phase === 'halfTime') return 'HT';
+function formatClock(
+  matchMinute: number,
+  phase: MatchPhase,
+  lastEvent: NormalizedEvent | undefined,
+  secondHalfStarted: boolean,
+  inHalfTimeBreak: boolean,
+): string {
   if (phase === 'fullTime') return 'FT';
-  const minute = Math.floor(matchMinute);
-  if (phase === 'firstHalf' && minute >= 45) return `45+${minute - 45}'`;
-  if (phase === 'secondHalf' && minute >= 90) return `90+${minute - 90}'`;
-  return `${minute}'`;
+  if (secondHalfStarted) {
+    return formatDisplayClock(matchMinute, 'secondHalf');
+  }
+  if (inHalfTimeBreak) return 'HT';
+  if (
+    lastEvent &&
+    lastEvent.matchPhase === 'firstHalf' &&
+    lastEvent.matchMinute >= 45
+  ) {
+    return lastEvent.displayMinute;
+  }
+  return formatDisplayClock(matchMinute, phase);
+}
+
+function shouldDeferEvent(
+  ev: NormalizedEvent,
+  secondHalfStarted: boolean,
+  halfTimeEmitted: boolean,
+): boolean {
+  if (secondHalfStarted) {
+    return (
+      ev.matchPhase === 'firstHalf' ||
+      ev.type === 'halfTime' ||
+      ev.matchPhase === 'halfTime'
+    );
+  }
+  if (ev.matchPhase === 'secondHalf' || ev.kickOffRole === 'secondHalfStart') {
+    return true;
+  }
+  if (halfTimeEmitted && ev.matchPhase === 'firstHalf') return true;
+  return false;
 }
 
 // ─── One tick of the simulation ────────────────────────────────────────────
+
+/** Real-time pause at HT before the clock resumes at 46'. */
+const HT_BREAK_REAL_MS = Number(process.env.HT_BREAK_REAL_MS ?? 4_000);
 
 /** Returns true if the match remains active after this tick (loop should continue). */
 async function tickOnce(match: ParsedMatch): Promise<boolean> {
@@ -225,19 +277,63 @@ async function tickOnce(match: ParsedMatch): Promise<boolean> {
   if (!clock.isRunning) return false;
   if (clock.phase === 'fullTime') return false;
 
+  const htIdx = match.events.findIndex((e) => e.type === 'halfTime');
+  const ko2Idx = match.events.findIndex((e) => e.kickOffRole === 'secondHalfStart');
+  const htMinute = htIdx >= 0 ? match.events[htIdx].matchMinute : 45.03;
+
   const now = Date.now();
-  const elapsedRealSec = (now - clock.startedAtWallMs) / 1000;
-  const matchMinute = (elapsedRealSec * SIM_RATE) / 60;
+  let startedAtWallMs = clock.startedAtWallMs;
+
+  // Recover state flags from the previous CLOCK row. These are the source of
+  // truth across tick boundaries (and across Lambda invocations during the
+  // EventBridge safety-net failover).
+  const halfTimeEmittedBefore = match.events
+    .slice(0, clock.lastEmittedSeq + 1)
+    .some((e) => e.type === 'halfTime');
+  const secondHalfStartedBefore =
+    clock.phase === 'secondHalf' ||
+    clock.phase === 'fullTime' ||
+    (ko2Idx >= 0 && clock.lastEmittedSeq >= ko2Idx);
+
+  let inHalfTimeBreak = halfTimeEmittedBefore && !secondHalfStartedBefore;
+  let htBreakEndsAt = clock.htBreakEndsAt ?? 0;
+  let secondHalfStarted = secondHalfStartedBefore;
+  let halfTimeEmitted = halfTimeEmittedBefore;
+
+  // If we're in the wall-clock HT break and it has now expired, snap to 46'
+  // and re-anchor the wall-clock so subsequent ticks compute matchMinute
+  // continuously from there.
+  if (inHalfTimeBreak && htBreakEndsAt > 0 && now >= htBreakEndsAt) {
+    inHalfTimeBreak = false;
+    secondHalfStarted = true;
+    startedAtWallMs = now - (SECOND_HALF_START_MINUTE * 60 * 1000) / SIM_RATE;
+  }
+
+  let matchMinute = ((now - startedAtWallMs) * SIM_RATE) / 60 / 1000;
+
+  if (inHalfTimeBreak) {
+    matchMinute = htMinute;
+  } else if (!secondHalfStarted) {
+    matchMinute = Math.min(matchMinute, htMinute);
+  } else {
+    matchMinute = Math.max(matchMinute, SECOND_HALF_START_MINUTE);
+  }
 
   const toEmit: Array<{ seq: number; event: NormalizedEvent }> = [];
   let lastSeq = clock.lastEmittedSeq;
-  let lastEvent: NormalizedEvent | undefined;
+  let lastEvent: NormalizedEvent | undefined =
+    lastSeq >= 0 ? match.events[lastSeq] : undefined;
   let scoreHome = clock.scoreHome;
   let scoreGuest = clock.scoreGuest;
 
+  // Drain up to (and including) htMinute when the break is active so any
+  // HT-window rows (subs at 45.030) finish before we move on.
+  const drainMinute = inHalfTimeBreak ? htMinute : matchMinute;
+
   for (let i = lastSeq + 1; i < match.events.length; i++) {
     const ev = match.events[i];
-    if (ev.matchMinute > matchMinute) break;
+    if (ev.matchMinute > drainMinute + 1e-6) break;
+    if (shouldDeferEvent(ev, secondHalfStarted, halfTimeEmitted)) break;
     toEmit.push({ seq: i, event: ev });
     lastSeq = i;
     lastEvent = ev;
@@ -245,20 +341,52 @@ async function tickOnce(match: ParsedMatch): Promise<boolean> {
       scoreHome = ev.scoreAfter.home;
       scoreGuest = ev.scoreAfter.guest;
     }
+    if (ev.type === 'halfTime') {
+      halfTimeEmitted = true;
+      inHalfTimeBreak = true;
+      htBreakEndsAt = now + HT_BREAK_REAL_MS;
+      // Critical: stop draining at the whistle. The HT-window subs and 2H
+      // events must wait for subsequent ticks so the UI gets the 'HT' freeze.
+      break;
+    }
+    if (ev.kickOffRole === 'secondHalfStart') {
+      secondHalfStarted = true;
+      inHalfTimeBreak = false;
+    }
   }
 
-  const phase = derivePhase(matchMinute, lastEvent);
+  // Snap the wall-clock anchor exactly once when we cross into 2H so the
+  // sub-second jitter at the boundary doesn't show up as 47'+.
+  if (secondHalfStarted && !secondHalfStartedBefore) {
+    startedAtWallMs = now - (SECOND_HALF_START_MINUTE * 60 * 1000) / SIM_RATE;
+    matchMinute = Math.max(matchMinute, SECOND_HALF_START_MINUTE);
+  }
+
+  const phase = derivePhase(matchMinute, lastEvent, secondHalfStarted, inHalfTimeBreak);
+  const publishedMinute = inHalfTimeBreak
+    ? htMinute
+    : secondHalfStarted
+      ? Math.max(matchMinute, SECOND_HALF_START_MINUTE)
+      : Math.min(matchMinute, htMinute);
+
   const next: ClockState = {
     matchId: clock.matchId,
     isRunning: phase !== 'fullTime',
-    startedAtWallMs: clock.startedAtWallMs,
-    matchMinute,
-    displayClock: formatClock(matchMinute, phase),
+    startedAtWallMs,
+    matchMinute: publishedMinute,
+    displayClock: formatClock(
+      publishedMinute,
+      phase,
+      lastEvent,
+      secondHalfStarted,
+      inHalfTimeBreak,
+    ),
     phase,
     scoreHome,
     scoreGuest,
     lastEmittedSeq: lastSeq,
     updatedAt: now,
+    htBreakEndsAt: inHalfTimeBreak ? htBreakEndsAt : undefined,
   };
 
   for (let i = 0; i < toEmit.length; i += 25) {
@@ -301,7 +429,11 @@ function sleep(ms: number): Promise<void> {
 
 // ─── Entrypoint — internal 2-second loop ───────────────────────────────────
 
-const LOOP_MAX_MS = 55_000; // exit before EventBridge re-fires at the 1-minute boundary
+// A full 90' match at SIM_RATE=30 plays in ~184 real seconds. Run a single
+// invocation long enough to cover the entire match (plus stoppage + HT break)
+// so the user never sees the gap caused by exiting before EventBridge re-fires.
+// Lambda timeout in CDK is bumped to 240s to match.
+const LOOP_MAX_MS = 220_000;
 const TICK_INTERVAL_MS = 2_000;
 
 export const handler = async (): Promise<void> => {

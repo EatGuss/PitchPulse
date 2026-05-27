@@ -106,7 +106,7 @@ export interface UserState {
   userId: string;
   matchPoints: number;
   streak: number;        // consecutive correct predictions (Gate 3 surfaces visually)
-  totalCorrect: number;  // for badges (Gate 3)
+  totalCorrect: number;
   totalVoted: number;
   history: PromptHistoryEntry[];
 }

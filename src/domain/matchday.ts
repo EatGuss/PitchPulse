@@ -16,6 +16,7 @@ export type MatchdayHeroState =
   | 'live_not_played'
   | 'lock_in_closed'
   | 'live_played'
+  | 'ranked_skipped'
   | 'post_matchday';
 
 export type FixtureSchedulePhase = 'soon' | 'live' | 'ft';
@@ -111,9 +112,10 @@ export function fixtureSchedulePhase(
   if (!fixture) return 'soon';
 
   if (isDemoFixture(fixture)) {
+    // Primary replay: Live while the feed is running; FT only after whistle (fullTime).
     if (clockPhase === 'fullTime') return 'ft';
-    if (isRunning || clockPhase !== 'preMatch') return 'live';
-    return 'soon';
+    if (clockPhase === 'preMatch' && !isRunning) return 'soon';
+    return 'live';
   }
 
   if (simKickoffWallMs === null) return 'soon';
@@ -139,6 +141,22 @@ export function fixtureScheduleStatus(
   const phase = fixtureSchedulePhase(f.id, clockPhase, isRunning, simKickoffWallMs);
   if (phase === 'live') return 'Live';
   if (phase === 'ft') return 'FT';
+  return 'Soon';
+}
+
+/** Label when a fixture cannot be selected (ranked lock-in / room pick rules). */
+export function fixtureUnavailablePickLabel(
+  fixtureId: string,
+  schedule: MatchdayScheduleContext,
+): string {
+  const phase = fixtureSchedulePhase(
+    fixtureId,
+    schedule.clockPhase,
+    schedule.isRunning,
+    schedule.simKickoffWallMs,
+  );
+  if (phase === 'live') return 'Live';
+  if (phase === 'ft') return 'Full time';
   return 'Soon';
 }
 

@@ -17,6 +17,5 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts"],
-  "exclude": ["scripts/verify-trivia-generate.ts"]
+  "include": ["vite.config.ts", "scripts/**/*.ts"]
 }

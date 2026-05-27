@@ -37,6 +37,8 @@ export type NormalizedEventType =
 
 export type MatchPhase = 'preMatch' | 'firstHalf' | 'halfTime' | 'secondHalf' | 'fullTime';
 
+export type KickOffRole = 'firstHalfStart' | 'secondHalfStart' | 'restart';
+
 export interface NormalizedEvent {
   id: string;
   type: NormalizedEventType;
@@ -44,6 +46,7 @@ export interface NormalizedEvent {
   displayMinute: string;
   matchPhase: MatchPhase;
   eventTimeIso: string;
+  kickOffRole?: KickOffRole;
   teamId?: string;
   playerId?: string;
   assistPlayerId?: string;
@@ -201,13 +204,132 @@ function classify(ev: RawEvent): {
   }
 }
 
-function displayMinute(matchMinute: number, phase: MatchPhase): string {
+export const SECOND_HALF_START_MINUTE = 46;
+
+export function formatDisplayClock(matchMinute: number, phase: MatchPhase): string {
   if (phase === 'halfTime') return 'HT';
   if (phase === 'fullTime') return 'FT';
-  const minute = Math.floor(matchMinute);
-  if (phase === 'firstHalf' && minute > 45) return `45+${minute - 45}'`;
-  if (phase === 'secondHalf' && minute > 90) return `90+${minute - 90}'`;
-  return `${minute}'`;
+  if (phase === 'firstHalf' && matchMinute >= 45) {
+    const capped = Math.min(matchMinute, SECOND_HALF_START_MINUTE - 0.001);
+    if (capped < 45 + 0.005) return "45'";
+    const added = Math.ceil((capped - 45 - 0.004) / 0.01);
+    return `45+${Math.max(1, added)}'`;
+  }
+  if (phase === 'secondHalf') {
+    const minute = Math.floor(matchMinute);
+    if (minute > 90) return `90+${minute - 90}'`;
+    return `${Math.max(SECOND_HALF_START_MINUTE, minute)}'`;
+  }
+  return `${Math.floor(matchMinute)}'`;
+}
+
+function resolveKickOffRole(
+  eventTimeIso: string,
+  gameSection: string,
+  firstKickoffIso: string,
+  secondKickoffIso: string | null,
+): KickOffRole {
+  if (eventTimeIso === firstKickoffIso && gameSection === 'firstHalf') return 'firstHalfStart';
+  if (secondKickoffIso && eventTimeIso === secondKickoffIso) return 'secondHalfStart';
+  return 'restart';
+}
+
+function adjustKickOffTiming(
+  type: NormalizedEventType | null,
+  kickOffRole: KickOffRole | undefined,
+  matchMinute: number,
+  matchPhase: MatchPhase,
+): { matchMinute: number; matchPhase: MatchPhase } {
+  if (type !== 'kickOff' || !kickOffRole) return { matchMinute, matchPhase };
+  if (kickOffRole === 'secondHalfStart') {
+    return {
+      matchMinute: Math.max(matchMinute, SECOND_HALF_START_MINUTE),
+      matchPhase: 'secondHalf',
+    };
+  }
+  if (kickOffRole === 'firstHalfStart') {
+    return { matchMinute: 0, matchPhase: 'firstHalf' };
+  }
+  return { matchMinute, matchPhase };
+}
+
+function finalizeHalfTimeTimeline(events: NormalizedEvent[]): void {
+  const ht = events.find((e) => e.type === 'halfTime');
+  const ko2 = events.find((e) => e.kickOffRole === 'secondHalfStart');
+  if (!ht) return;
+
+  const oldHtMin = ht.matchMinute;
+  const stoppage1H = events.find(
+    (e) => e.type === 'stoppageTimeAnnounced' && e.matchPhase === 'firstHalf',
+  );
+  const preHtLate = events
+    .filter(
+      (e) =>
+        e.matchPhase === 'firstHalf' &&
+        e.type !== 'stoppageTimeAnnounced' &&
+        e.matchMinute > 44 &&
+        e.matchMinute < oldHtMin + 0.01,
+    )
+    .sort((a, b) => a.matchMinute - b.matchMinute);
+
+  if (stoppage1H) {
+    stoppage1H.matchMinute = 45;
+    stoppage1H.matchPhase = 'firstHalf';
+    stoppage1H.displayMinute = formatDisplayClock(45, 'firstHalf');
+  }
+
+  let slot = 45;
+  for (const e of preHtLate) {
+    slot += 0.01;
+    e.matchMinute = Number(slot.toFixed(3));
+    e.matchPhase = 'firstHalf';
+    e.displayMinute = formatDisplayClock(e.matchMinute, 'firstHalf');
+  }
+
+  const addedSlots = Math.max(
+    preHtLate.length,
+    stoppage1H?.stoppageMinutes ?? 0,
+    1,
+  );
+  const htMinute = Number((45 + addedSlots * 0.01 + 0.01).toFixed(3));
+
+  for (const e of events) {
+    if (e.matchPhase === 'halfTime' && e.type !== 'halfTime') {
+      e.matchMinute = htMinute;
+      e.displayMinute = 'HT';
+    }
+  }
+
+  ht.matchMinute = htMinute;
+  ht.displayMinute = 'HT';
+  ht.matchPhase = 'halfTime';
+
+  if (ko2) {
+    ko2.matchMinute = SECOND_HALF_START_MINUTE;
+    ko2.displayMinute = formatDisplayClock(SECOND_HALF_START_MINUTE, 'secondHalf');
+    ko2.matchPhase = 'secondHalf';
+
+    let slot = SECOND_HALF_START_MINUTE + 0.001;
+    for (const e of events) {
+      if (e === ko2) continue;
+      if (e.matchPhase !== 'secondHalf') continue;
+      if (e.matchMinute >= SECOND_HALF_START_MINUTE) continue;
+      e.matchMinute = Number(slot.toFixed(3));
+      slot += 0.001;
+      e.displayMinute = formatDisplayClock(e.matchMinute, 'secondHalf');
+    }
+  }
+
+  const htIdx = events.findIndex((e) => e.type === 'halfTime');
+  if (htIdx >= 0) {
+    for (let i = htIdx + 1; i < events.length; i++) {
+      const e = events[i];
+      if (e.matchPhase !== 'firstHalf') continue;
+      e.matchPhase = 'halfTime';
+      e.matchMinute = htMinute;
+      e.displayMinute = 'HT';
+    }
+  }
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -241,18 +363,16 @@ export function parseEvents(xml: string): {
   const all = ((root['Event'] ?? []) as RawEvent[]);
 
   let firstKickoffIso: string | null = null;
-  let secondKickoffIso: string | null = null;
   for (const ev of all) {
     if (firstChildElementName(ev) !== 'KickOff') continue;
     const ko = ev['KickOff'] as Record<string, string>;
-    const section = String(ko['@_GameSection']);
-    if (section === 'firstHalf' && !firstKickoffIso) firstKickoffIso = String(ev['@_EventTime']);
-    if (section === 'secondHalf' && !secondKickoffIso) secondKickoffIso = String(ev['@_EventTime']);
+    if (String(ko['@_GameSection']) === 'firstHalf' && !firstKickoffIso) {
+      firstKickoffIso = String(ev['@_EventTime']);
+    }
   }
   if (!firstKickoffIso) throw new Error('No firstHalf KickOff event found');
 
   const t1 = Date.parse(firstKickoffIso);
-  const t2 = secondKickoffIso ? Date.parse(secondKickoffIso) : null;
 
   let firstHalfEndIso: string | null = null;
   for (const ev of all) {
@@ -264,6 +384,21 @@ export function parseEvents(xml: string): {
     }
   }
   const tHt = firstHalfEndIso ? Date.parse(firstHalfEndIso) : Infinity;
+
+  let secondKickoffIso: string | null = null;
+  for (const ev of all) {
+    if (firstChildElementName(ev) !== 'KickOff') continue;
+    const ko = ev['KickOff'] as Record<string, string>;
+    if (String(ko['@_GameSection']) !== 'secondHalf') continue;
+    const iso = String(ev['@_EventTime']);
+    const t = Date.parse(iso);
+    if (t <= tHt) continue;
+    if (!secondKickoffIso || t < Date.parse(secondKickoffIso)) {
+      secondKickoffIso = iso;
+    }
+  }
+
+  const t2 = secondKickoffIso ? Date.parse(secondKickoffIso) : null;
 
   const events: NormalizedEvent[] = [];
   for (const ev of all) {
@@ -292,13 +427,25 @@ export function parseEvents(xml: string): {
     if (type === 'halfTime') matchPhase = 'halfTime';
     if (type === 'fullTime') matchPhase = 'fullTime';
 
+    const eventTimeIso = String(ev['@_EventTime']);
+    const gameSection = type === 'kickOff' ? String(payload['gameSection'] ?? '') : '';
+    const kickOffRole =
+      type === 'kickOff'
+        ? resolveKickOffRole(eventTimeIso, gameSection, firstKickoffIso, secondKickoffIso)
+        : undefined;
+
+    const adjusted = adjustKickOffTiming(type, kickOffRole, matchMinute, matchPhase);
+    matchMinute = adjusted.matchMinute;
+    matchPhase = adjusted.matchPhase;
+
     events.push({
       id: String(ev['@_EventId']),
       type,
       matchMinute: Number(matchMinute.toFixed(3)),
-      displayMinute: displayMinute(matchMinute, matchPhase),
+      displayMinute: formatDisplayClock(matchMinute, matchPhase),
       matchPhase,
-      eventTimeIso: String(ev['@_EventTime']),
+      eventTimeIso,
+      kickOffRole,
       teamId: payload['teamId'] as string | undefined,
       playerId: payload['playerId'] as string | undefined,
       assistPlayerId: payload['assistPlayerId'] as string | undefined,
@@ -308,6 +455,7 @@ export function parseEvents(xml: string): {
     });
   }
 
+  finalizeHalfTimeTimeline(events);
   events.sort((a, b) => a.matchMinute - b.matchMinute);
   return { events, firstKickoffIso, secondKickoffIso };
 }
