@@ -1,10 +1,14 @@
 # PitchPulse
 
-Real-time social Bundesliga matchday companion — submission for the **DFL × Adidas × Slalom** *Fan Squad* hackathon, Challenge 3 ("A Real-Time Social Match Experience").
+Real-time social Bundesliga matchday companion submission for the **DFL × Adidas × Slalom** *Fan Squad* hackathon, Challenge 3 ("A Real-Time Social Match Experience").
 
-Two fans, one matchday. Live event ticker, predict-the-next-moment prompts, PitchPoints, weekly/seasonal standings, collectible titles, and badges — all reacting to a replayed Bundesliga match in real time.
+Two fans, one matchday. Live event ticker, predict-the-next-moment prompts(shots), PitchPoints, weekly/seasonal standings and collectible titles all reacting to a replayed Bundesliga match in real time.
 
-> **Status:** MVP complete through **Gate J** (Hot Take UI) plus ranked post-match flow (outcome screens → tier promotion → match summary) on `main`. See [PITCHPULSE.md](./PITCHPULSE.md) for the full design spec / ADRs if present.
+PitchPulse is mainly focused around shots a prediction game where users are prompted with a prediction(who will score the next goal), the user will answer with one of the options the prompt gives and if they predict correctly they get PitchPoints putting them ahead of their peers who guessed wrong.
+
+1.Watchrooms are designed for online/irl watch parties to give the people a fun little game to play on the side, disscuss shot outcomes and helps new football fans to understand the game.
+
+2.Ranked is design for a fun competitive kick to shots where they face off against other shot-callers in a 1v1. in this 1v1 the shot-callers have access to a ranked specific feature called hot takes which allows the shot-caller to get 2.5x the original amount from the shot only 1 shot-caller can activate this so it adds a bit of strategy. After winning a ranked game the shot-caller gets ranked progress and a match summary, with 5 ranks(Bronze, Silver, Gold, Diamond, Champion) in total with specific number wins to promote to the next. This mode is limited to one game a game week.
 
 ---
 
