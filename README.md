@@ -4,11 +4,11 @@ Real-time social Bundesliga matchday companion submission for the **DFL × Adida
 
 Two fans, one matchday. Live event ticker, predict-the-next-moment prompts(shots), PitchPoints, weekly/seasonal standings and collectible titles all reacting to a replayed Bundesliga match in real time.
 
-PitchPulse is mainly focused around shots a prediction game where users are prompted with a prediction(who will score the next goal), the user will answer with one of the options the prompt gives and if they predict correctly they get PitchPoints putting them ahead of their peers who guessed wrong.
+PitchPulse is a prediction game built around "shots." Users are given a prediction prompt (for example, who will score the next goal) and choose from the options provided. If they predict correctly, they earn PitchPoints, putting them ahead of peers who guessed wrong.
 
-1.Watchrooms are designed for online/irl watch parties to give the people a fun little game to play on the side, disscuss shot outcomes and helps new football fans to understand the game.
+1.Watchrooms are designed for online and in-person watch parties. They give people a fun game to play on the side, a space to discuss shot outcomes, and a way to help new football fans understand the game.
 
-2.Ranked is design for a fun competitive kick to shots where they face off against other shot-callers in a 1v1. in this 1v1 the shot-callers have access to a ranked specific feature called hot takes which allows the shot-caller to get 2.5x the original amount from the shot only 1 shot-caller can activate this so it adds a bit of strategy. After winning a ranked game the shot-caller gets ranked progress and a match summary, with 5 ranks(Bronze, Silver, Gold, Diamond, Champion) in total with specific number wins to promote to the next. This mode is limited to one game a game week.
+2.Ranked adds a competitive edge to shots, pitting shot-callers against each other in 1v1 matches. In Ranked, shot-callers have access to a mode-specific feature called Hot Takes(can be used twice in a match), which awards 2.5x the original points from a shot. Only one shot-caller can activate it per shot, so it introduces an element of strategy. After winning a Ranked game, the shot-caller earns ranked progress and a match summary. There are five ranks in total — Bronze, Silver, Gold, Diamond, and Champion — each requiring a specific number of wins to advance to the next. This mode is limited to one game per game week.
 
 ---
 
