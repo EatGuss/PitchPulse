@@ -4,6 +4,7 @@
  */
 
 import { isAwsMode } from '../aws/config';
+import { resetRankedSettlements } from '../aws/rankedMatchClient';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import { resetLocalLeaderboardStore } from './localLeaderboardStore';
 import { resetLocalProfileStore } from './localProfileStore';
@@ -20,6 +21,7 @@ export interface ResetDemoStateResult {
 
 export function resetDemoClientState(): ResetDemoStateResult {
   resetRankedMatchdayPlay();
+  resetRankedSettlements();
   resetLocalLeaderboardStore();
   resetLocalProfileStore();
   resetTitleUnlockSession();

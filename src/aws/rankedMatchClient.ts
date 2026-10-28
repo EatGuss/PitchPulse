@@ -15,7 +15,46 @@ interface CompleteRankedMatchResponse {
   completeRankedMatch: RankedMatchResult;
 }
 
-export async function commitCompleteRankedMatch(
+/**
+ * Settlements already started this session, keyed by match + player pair.
+ * On /demo both phone frames reach full time and each calls this function;
+ * the second caller must get the first caller's result, not apply it again.
+ */
+const settlements = new Map<string, Promise<RankedMatchResult>>();
+
+function settlementKey(matchId: string, a: string, b: string): string {
+  return `${matchId}#${[a, b].sort().join('|')}`;
+}
+
+/** Forget settled matches — called by the demo reset so a replay can settle again. */
+export function resetRankedSettlements(): void {
+  settlements.clear();
+}
+
+export function commitCompleteRankedMatch(
+  matchId: string,
+  winnerId: DemoUserId,
+  loserId: DemoUserId,
+  winnerMatchPoints: number,
+  loserMatchPoints: number,
+  titleStats?: RankedMatchTitleInput,
+): Promise<RankedMatchResult> {
+  const key = settlementKey(matchId, winnerId, loserId);
+  const existing = settlements.get(key);
+  if (existing) return existing;
+  const pending = settleRankedMatch(
+    matchId,
+    winnerId,
+    loserId,
+    winnerMatchPoints,
+    loserMatchPoints,
+    titleStats,
+  );
+  settlements.set(key, pending);
+  return pending;
+}
+
+async function settleRankedMatch(
   matchId: string,
   winnerId: DemoUserId,
   loserId: DemoUserId,
