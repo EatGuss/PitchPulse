@@ -10,6 +10,7 @@
  */
 
 import {
+  ConditionalCheckFailedException,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -639,7 +640,65 @@ async function completeRankedDrawMatch(
   };
 }
 
+/**
+ * Settle a ranked match at most once per player pair and matchday. Both
+ * clients call this at full time, so the second call must return the first
+ * call's result without touching tier, points, shots or titles again.
+ * The claim row is written before any other write, with a condition, so two
+ * concurrent invocations cannot both pass it.
+ */
 async function completeRankedMatch(
+  matchId: string,
+  winnerId: string,
+  loserId: string,
+  winnerMatchPoints: number,
+  loserMatchPoints: number,
+  titleInput: MatchTitleStatsInput = {},
+) {
+  const key = marshall({
+    PK: `RANKED_SETTLEMENT#${DEMO_MATCHDAY_ID}`,
+    SK: `PAIR#${[winnerId, loserId].sort().join('|')}`,
+  });
+
+  try {
+    await ddb.send(
+      new PutItemCommand({
+        TableName: USERS_TABLE,
+        Item: { ...key, ...marshall({ matchId, claimedAt: Date.now() }) },
+        ConditionExpression: 'attribute_not_exists(PK)',
+      }),
+    );
+  } catch (err) {
+    if (!(err instanceof ConditionalCheckFailedException)) throw err;
+    const prior = await ddb.send(
+      new GetItemCommand({ TableName: USERS_TABLE, Key: key, ConsistentRead: true }),
+    );
+    const stored = prior.Item ? (unmarshall(prior.Item) as { result?: string }).result : undefined;
+    if (!stored) throw new Error('Ranked match settlement already in progress');
+    return JSON.parse(stored) as Awaited<ReturnType<typeof settleRankedMatch>>;
+  }
+
+  const result = await settleRankedMatch(
+    matchId,
+    winnerId,
+    loserId,
+    winnerMatchPoints,
+    loserMatchPoints,
+    titleInput,
+  );
+  await ddb.send(
+    new UpdateItemCommand({
+      TableName: USERS_TABLE,
+      Key: key,
+      UpdateExpression: 'SET #r = :r',
+      ExpressionAttributeNames: { '#r': 'result' },
+      ExpressionAttributeValues: marshall({ ':r': JSON.stringify(result) }),
+    }),
+  );
+  return result;
+}
+
+async function settleRankedMatch(
   matchId: string,
   winnerId: string,
   loserId: string,

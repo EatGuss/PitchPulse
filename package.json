@@ -15,6 +15,7 @@
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "verify": "tsx scripts/verify-payouts.ts",
     "verify:titles": "tsx scripts/verify-title-rules.ts",
+    "verify:settlement": "tsx scripts/verify-ranked-settlement.ts",
     "verify:half-time": "tsx scripts/verify-half-time-clock.ts"
   },
   "dependencies": {
