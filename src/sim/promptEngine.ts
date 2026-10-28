@@ -327,6 +327,13 @@ export class PromptEngine {
       }
     }
 
+    // The sim stops ticking after full time and prompts only lock on a running
+    // clock, so close the window here or the prompt would stay open forever.
+    if (ev.type === 'fullTime' && this.active && this.active.state === 'open') {
+      this.active.state = 'locked';
+      this.bus.emit('promptClosed', { prompt: this.snapshot(this.active) });
+    }
+
     // Re-attempt resolution if window has already closed.
     if (this.active && this.active.state === 'locked') {
       this.tryResolve();
