@@ -10,9 +10,11 @@
  * modes during a session.
  */
 
-const url = import.meta.env.VITE_APPSYNC_URL;
-const region = import.meta.env.VITE_APPSYNC_REGION;
-const identityPoolId = import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID;
+// Opt-typed view so the module also loads headless under tsx (see matchSim.ts).
+const env = (import.meta as { env?: Partial<ImportMetaEnv> }).env;
+const url = env?.VITE_APPSYNC_URL;
+const region = env?.VITE_APPSYNC_REGION;
+const identityPoolId = env?.VITE_COGNITO_IDENTITY_POOL_ID;
 
 export const awsConfig = {
   url,
