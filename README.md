@@ -17,6 +17,9 @@ PitchPulse is a prediction game built around "shots." Users are given a predicti
 ```bash
 npm install
 cp .env.example .env.local      # leave VITE_APPSYNC_URL empty for local-only demo
+# One-time: copy the two DFL XML files into data/Match-Events/ (not in git — see
+# "How to run locally" → "Match data"). Without them `npm run dev` stops with an
+# explanation, because both local and AWS mode load the parsed match files.
 npm run dev
 ```
 
@@ -291,7 +294,7 @@ npm install
 
 Use either path:
 
-- **AWS-backed sim (recommended for reviewers):** deploy CDK ([below](#how-to-deploy-to-aws)), fill AppSync/Cognito in `.env.local` — the emitter reads **`hackathon-data-058755927272`** directly.
+- **AWS-backed sim:** deploy CDK ([below](#how-to-deploy-to-aws)), fill AppSync/Cognito in `.env.local` — the emitter reads **`hackathon-data-058755927272`** directly. The browser still needs `public/match-info.json` (team and player names) and `public/events.json`, so the local XML mirror below is required for this path too.
 - **In-browser sim:** optionally mirror the two XML keys from that bucket into gitignored `data/Match-Events/` on your machine, then `npm run parse` — never commit those files or derived JSON.
 
 ### 2. Configure environment
