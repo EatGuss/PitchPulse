@@ -10,14 +10,25 @@
     "build": "tsc",
     "watch": "tsc -w",
     "cdk": "cdk",
+    "typecheck:lambda": "tsc -p lambda/tsconfig.json",
     "synth": "cdk synth",
     "deploy": "cdk deploy --require-approval never",
     "destroy": "cdk destroy --force"
   },
   "devDependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1159.0",
+    "@aws-sdk/client-dynamodb": "^3.1159.0",
+    "@aws-sdk/client-lambda": "^3.1159.0",
+    "@aws-sdk/client-s3": "^3.1159.0",
+    "@aws-sdk/client-ssm": "^3.1159.0",
+    "@aws-sdk/credential-provider-node": "^3.972.90",
+    "@aws-sdk/protocol-http": "^3.370.0",
+    "@aws-sdk/signature-v4": "^3.370.0",
+    "@aws-sdk/util-dynamodb": "^3.996.9",
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^22.7.4",
     "aws-cdk": "^2.1024.0",
+    "aws-sdk-client-mock": "^4.1.0",
     "esbuild": "^0.24.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2"
@@ -25,6 +36,7 @@
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
     "aws-cdk-lib": "^2.225.0",
+    "aws-jwt-verify": "^4.0.1",
     "constructs": "^10.4.2",
     "fast-xml-parser": "^5.8.0"
   }
