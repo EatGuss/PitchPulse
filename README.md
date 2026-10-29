@@ -168,7 +168,7 @@ Goal: lock-in, hidden picks, Hot Take, outcome screen, optional rank-up, match s
 
 ### Demo C — AWS-backed sim (optional)
 
-If `.env.local` has `VITE_APPSYNC_URL` and `VITE_COGNITO_IDENTITY_POOL_ID` from `cdk deploy`, restart `npm run dev`. Console should log `[aws-bridge] attached`. **Kick off** then calls `startMatch` in Lambda; both phones subscribe to the same AppSync events. Steps above are the same; only the event source changes.
+If `.env.local` has `VITE_APPSYNC_URL` and `VITE_COGNITO_USER_POOL_CLIENT_ID` from `cdk deploy`, restart `npm run dev` and enter the demo password on the sign-in screen. Console should log `[aws-bridge] attached`. **Kick off** then calls `startMatch` in Lambda; both phones subscribe to the same AppSync events. Steps above are the same; only the event source changes.
 
 Deploy steps: [How to deploy to AWS](#how-to-deploy-to-aws).
 
@@ -256,8 +256,8 @@ A disclosure line is shown on `/demo`, `/`, and onboarding. Per challenge brief 
                                                      ▼
                                    ┌──────────────────────────────┐
                                    │ React / Vite frontend        │
-                                   │  Amplify v6 anonymous guest  │
-                                   │  Cognito Identity Pool       │
+                                   │  Cognito ID token per user   │
+                                   │  → AppSync Lambda authorizer │
                                    └──────────────────────────────┘
 ```
 
@@ -271,7 +271,9 @@ A disclosure line is shown on `/demo`, `/`, and onboarding. Per challenge brief 
 | `pp-rooms` | `ROOM#<room_id>` | `META` / `MEMBER#<user>` / `REACTION#<ts>` / `COMMENT#<ts>` | `InviteCodeIndex` GSI; TTL on `expiresAt` (24h) |
 | `pp-leaderboards` | period key | `USER#<id>` | Weekly / seasonal standings |
 
-**Auth:** Cognito Identity Pool, anonymous guest role. Two pre-created demo IDs (`alice`, `bob`) — no signup, no email, no PII.
+**Auth:** Cognito User Pool with three pre-created accounts (`alice`, `bob`, and `operator` in the `operators` group) sharing one demo password; no signup, no email, no PII. Every client request carries the acting user's ID token and goes through the AppSync Lambda authorizer (`cdk/lambda/authorizer`), and every handler acts as that verified user — client inputs carry no `userId`. Only `operator` may `startMatch` / `resetMatch`. Server Lambdas use IAM. There is no anonymous access.
+
+The demo password is shared by design (one password signs in all three accounts on `/demo`), so anyone holding it can act as any demo user; it stops strangers, not demo participants.
 
 **Region:** `eu-central-1` (Frankfurt). Every AWS SDK client, CDK env, and CLI command is pinned to this region.
 
@@ -360,6 +362,15 @@ npx cdk bootstrap aws://058755927272/eu-central-1 \
 
 ### Deploy the stack
 
+Set the shared demo password first (at least 12 characters). It lives only in SSM; a deploy-time custom resource applies it to the `alice`, `bob` and `operator` accounts, and it is never written to the template, the outputs or the frontend bundle:
+
+```bash
+aws ssm put-parameter --name /pitchpulse/demo-password --type SecureString \
+  --value '<demo password>' --profile <YOUR_ISB_PROFILE>
+```
+
+To rotate it, update the parameter and redeploy. Use a different parameter name with `-c demoPasswordParam=/your/name`.
+
 ```bash
 cd cdk
 npm install
@@ -373,14 +384,13 @@ Copy outputs into the repo-root `.env.local`:
 ```bash
 VITE_APPSYNC_URL=https://<id>.appsync-api.eu-central-1.amazonaws.com/graphql
 VITE_APPSYNC_REGION=eu-central-1
-VITE_COGNITO_IDENTITY_POOL_ID=eu-central-1:<uuid>
+VITE_COGNITO_USER_POOL_CLIENT_ID=<UserPoolClientId output>
 ```
 
-Restart `npm run dev`. A healthy AWS session logs:
+Restart `npm run dev` and sign in with the demo password. A healthy AWS session logs:
 
 ```
 [amplify] configured for AppSync @ https://...
-[amplify] cognito session ready: identityId=... creds=yes
 [aws-bridge] attached — matchClock + matchEvent subscriptions live
 ```
 
