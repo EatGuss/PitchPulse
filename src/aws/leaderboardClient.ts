@@ -2,7 +2,7 @@
  * Weekly / seasonal standings — AWS GraphQL with local demo fallback (Gate F).
  */
 
-import { generateClient } from 'aws-amplify/api';
+import { VIEWER, gql, gqlSubscribe } from './session';
 import type { DemoUserId } from '../data/personas';
 import type { LeaderboardEntry, StandingsPeriod, UserStats } from '../domain/leaderboardTypes';
 import { normalizeLifetimeAccuracy } from '../domain/accuracy';
@@ -48,13 +48,6 @@ interface GraphqlUserStats {
   rankedMatchesPlayed: number | null;
 }
 
-type SubscriptionLike<T> = {
-  subscribe: (handlers: {
-    next: (value: { data?: T }) => void;
-    error?: (err: unknown) => void;
-  }) => { unsubscribe: () => void };
-};
-
 function mapEntry(row: GraphqlLeaderboardEntry): LeaderboardEntry {
   return {
     rank: row.rank,
@@ -89,11 +82,9 @@ function mapUserStats(row: GraphqlUserStats): UserStats {
 export async function fetchWeeklyLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
   if (!isAwsMode) return localGetWeeklyLeaderboard(limit);
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: WEEKLY_LEADERBOARD,
-    variables: { limit },
-  })) as { data?: { weeklyLeaderboard: GraphqlLeaderboardEntry[] } };
+  const res = await gql<{ weeklyLeaderboard: GraphqlLeaderboardEntry[] }>(VIEWER, WEEKLY_LEADERBOARD, {
+    limit,
+  });
 
   return (res.data?.weeklyLeaderboard ?? []).map(mapEntry);
 }
@@ -104,11 +95,11 @@ export async function fetchSeasonalLeaderboard(
 ): Promise<LeaderboardEntry[]> {
   if (!isAwsMode) return localGetSeasonalLeaderboard(limit);
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: SEASONAL_LEADERBOARD,
-    variables: { seasonNumber, limit },
-  })) as { data?: { seasonalLeaderboard: GraphqlLeaderboardEntry[] } };
+  const res = await gql<{ seasonalLeaderboard: GraphqlLeaderboardEntry[] }>(
+    VIEWER,
+    SEASONAL_LEADERBOARD,
+    { seasonNumber, limit },
+  );
 
   return (res.data?.seasonalLeaderboard ?? []).map(mapEntry);
 }
@@ -117,14 +108,8 @@ export async function fetchUserStats(userId: DemoUserId): Promise<UserStats> {
   if (!isAwsMode) return localGetUserStats(userId);
 
   try {
-    const client = generateClient();
-    const res = (await client.graphql({
-      query: USER_STATS,
-      variables: { userId },
-    })) as {
-      data?: { userStats: GraphqlUserStats | null };
-      errors?: Array<{ message: string }>;
-    };
+    // userStats is a public read: userId names whose stats, not who is asking.
+    const res = await gql<{ userStats: GraphqlUserStats | null }>(userId, USER_STATS, { userId });
 
     if (res.errors?.length) {
       throw new Error(res.errors.map((e) => e.message).join('; '));
@@ -147,25 +132,20 @@ function subscribeAwsPeriod(
   period: StandingsPeriod,
   onUpdate: (period: StandingsPeriod) => void,
 ): () => void {
-  const client = generateClient();
-  const obs = client.graphql({
-    query: SUB_LEADERBOARD_UPDATED,
-    variables: { period: graphqlPeriod(period) },
-  }) as unknown as SubscriptionLike<{
+  return gqlSubscribe<{
     leaderboardUpdated: { period: 'WEEKLY' | 'SEASONAL'; updatedAt: number };
-  }>;
-
-  const sub = obs.subscribe({
-    next: ({ data }) => {
-      if (!data?.leaderboardUpdated) return;
-      onUpdate(data.leaderboardUpdated.period === 'WEEKLY' ? 'weekly' : 'seasonal');
+  }>(
+    VIEWER,
+    SUB_LEADERBOARD_UPDATED,
+    { period: graphqlPeriod(period) },
+    {
+      next: (data) => {
+        if (!data?.leaderboardUpdated) return;
+        onUpdate(data.leaderboardUpdated.period === 'WEEKLY' ? 'weekly' : 'seasonal');
+      },
+      error: (err) => console.error('[leaderboard] subscription error', period, err),
     },
-    error: (err) => {
-      console.error('[leaderboard] subscription error', period, err);
-    },
-  });
-
-  return () => sub.unsubscribe();
+  );
 }
 
 /** Refresh callback when weekly or seasonal standings change. */

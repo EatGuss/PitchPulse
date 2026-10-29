@@ -4,13 +4,13 @@
  * or when AWS is out of sync with local lock-in (common on /demo).
  */
 
-import { generateClient } from 'aws-amplify/api';
 import { DEMO_USERS, type DemoUserId } from '../data/personas';
 import type { RankedOpponent } from '../domain/rankedTypes';
 import type { Tier } from '../domain/tiers';
 import { getUserRankedMatchdayStatus } from '../sim/matchdayStore';
 import { isAwsMode } from './config';
 import { FIND_RANKED_MATCH } from './operations';
+import { gql } from './session';
 
 /** Narrative tiers for /demo matchmaking reveal (not live AWS PROFILE). */
 const DEMO_OPPONENT_SEED_TIER: Record<DemoUserId, Tier> = {
@@ -77,11 +77,7 @@ export async function findRankedMatch(userId: DemoUserId): Promise<RankedOpponen
   }
 
   try {
-    const client = generateClient();
-    const res = (await client.graphql({
-      query: FIND_RANKED_MATCH,
-      variables: { userId },
-    })) as { data?: FindRankedMatchResponse; errors?: Array<{ message: string }> };
+    const res = await gql<FindRankedMatchResponse>(userId, FIND_RANKED_MATCH);
 
     const gqlErr = graphqlErrorMessage(res);
     if (gqlErr) throw new Error(gqlErr);

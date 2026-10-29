@@ -3,7 +3,11 @@
  *
  * Kept as plain template literals (no codegen) — the AppSync schema is small
  * enough that hand-writing the queries is faster than wiring up a generator
- * for a hackathon submission.
+ * for a hackathon submission. scripts/verify-graphql.ts validates every one
+ * against cdk/schema/schema.graphql, including which auth mode may call it.
+ *
+ * None of these send a userId for the acting user: the server takes it from
+ * the verified token (see src/aws/session.ts).
  */
 
 export const START_MATCH = /* GraphQL */ `
@@ -188,8 +192,8 @@ export const SUB_ROOM_LEADERBOARD = /* GraphQL */ `
 `;
 
 export const FIND_RANKED_MATCH = /* GraphQL */ `
-  mutation FindRankedMatch($userId: ID!) {
-    findRankedMatch(userId: $userId) {
+  mutation FindRankedMatch {
+    findRankedMatch {
       opponentId
       opponentName
       opponentTier
@@ -239,8 +243,8 @@ export const COMPLETE_RANKED_MATCH = /* GraphQL */ `
 `;
 
 export const RANKED_MATCHDAY_STATUS = /* GraphQL */ `
-  query RankedMatchdayStatus($userId: ID!, $matchdayId: ID!) {
-    rankedMatchdayStatus(userId: $userId, matchdayId: $matchdayId) {
+  query RankedMatchdayStatus($matchdayId: ID!) {
+    rankedMatchdayStatus(matchdayId: $matchdayId) {
       matchdayId
       lockedFixtureId
       lockedFixtureLabel
@@ -321,8 +325,8 @@ export const SUB_TITLE_UNLOCKED = /* GraphQL */ `
 `;
 
 export const EQUIP_TITLE = /* GraphQL */ `
-  mutation EquipTitle($userId: ID!, $titleId: String!) {
-    equipTitle(userId: $userId, titleId: $titleId)
+  mutation EquipTitle($titleId: String!) {
+    equipTitle(titleId: $titleId)
   }
 `;
 
@@ -363,8 +367,8 @@ export const SIGNAL_HOT_TAKE = /* GraphQL */ `
 `;
 
 export const INIT_RANKED_HOT_TAKE = /* GraphQL */ `
-  mutation InitRankedHotTake($userId: ID!, $matchId: ID!) {
-    initRankedHotTake(userId: $userId, matchId: $matchId)
+  mutation InitRankedHotTake($matchId: ID!) {
+    initRankedHotTake(matchId: $matchId)
   }
 `;
 
@@ -381,7 +385,7 @@ export const SUB_RIVAL_HOT_TAKE = /* GraphQL */ `
 `;
 
 export const UNLOCK_HOT_TAKE_HERO = /* GraphQL */ `
-  mutation UnlockHotTakeHero($userId: ID!) {
-    unlockHotTakeHero(userId: $userId)
+  mutation UnlockHotTakeHero {
+    unlockHotTakeHero
   }
 `;

@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import type { AppSyncResolverEvent } from 'aws-lambda';
+import { callerFrom } from '../shared/identity';
 
 const REGION = process.env.AWS_REGION ?? 'eu-central-1';
 const PROMPTS_TABLE = required('PROMPTS_TABLE');
@@ -27,7 +28,6 @@ interface SubmitVoteArgs {
   input: {
     matchId: string;
     promptId: string;
-    userId: string;
     optionId: string;
     hotTake?: boolean;
     rankedMode?: boolean;
@@ -38,7 +38,6 @@ interface SignalHotTakeArgs {
   input: {
     matchId: string;
     promptId: string;
-    userId: string;
     rivalUserId: string;
   };
 }
@@ -104,8 +103,8 @@ async function decrementHotTake(userId: string, matchId: string): Promise<void> 
   );
 }
 
-async function submitVote(args: SubmitVoteArgs['input']) {
-  const { matchId, promptId, userId, optionId, hotTake = false, rankedMode = false } = args;
+async function submitVote(userId: string, args: SubmitVoteArgs['input']) {
+  const { matchId, promptId, optionId, hotTake = false, rankedMode = false } = args;
   const votedAt = Date.now();
   const expiresAt = Math.floor(votedAt / 1000) + 86400;
 
@@ -138,8 +137,8 @@ async function submitVote(args: SubmitVoteArgs['input']) {
   return { matchId, promptId, userId, optionId, hotTake: hotTake && rankedMode, votedAt };
 }
 
-async function signalHotTake(args: SignalHotTakeArgs['input']) {
-  const { matchId, promptId, userId, rivalUserId } = args;
+async function signalHotTake(userId: string, args: SignalHotTakeArgs['input']) {
+  const { matchId, promptId, rivalUserId } = args;
   const remaining = await getRemainingHotTakes(userId, matchId);
   if (remaining <= 0) {
     throw new Error('No hot takes remaining this match');
@@ -154,13 +153,14 @@ async function signalHotTake(args: SignalHotTakeArgs['input']) {
 }
 
 export const handler = async (event: AppSyncResolverEvent<Record<string, unknown>>) => {
+  const { userId } = callerFrom(event);
   switch (event.info.fieldName) {
     case 'submitVote':
-      return submitVote(event.arguments.input as SubmitVoteArgs['input']);
+      return submitVote(userId, event.arguments.input as SubmitVoteArgs['input']);
     case 'signalHotTake':
-      return signalHotTake(event.arguments.input as SignalHotTakeArgs['input']);
+      return signalHotTake(userId, event.arguments.input as SignalHotTakeArgs['input']);
     case 'initRankedHotTake':
-      await initHotTakeState(event.arguments.userId as string, event.arguments.matchId as string);
+      await initHotTakeState(userId, event.arguments.matchId as string);
       return true;
     default:
       throw new Error(`Unsupported field: ${event.info.fieldName}`);

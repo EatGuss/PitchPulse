@@ -2,11 +2,11 @@
  * Ranked match completion — completeRankedMatch + local fallback (Gate D).
  */
 
-import { generateClient } from 'aws-amplify/api';
 import type { DemoUserId } from '../data/personas';
 import type { RankedMatchResult } from '../domain/rankedTypes';
 import { isAwsMode } from './config';
 import { COMPLETE_RANKED_MATCH } from './operations';
+import { gql } from './session';
 import type { RankedMatchTitleInput } from '../domain/rankedMatchStats';
 import { localCompleteRankedDrawMatch, localCompleteRankedMatch } from '../sim/localProfileStore';
 import { finalizeRankedDrawMatchTitles, finalizeRankedMatchTitles } from '../sim/titleUnlockEngine';
@@ -86,11 +86,8 @@ async function settleRankedMatch(
   };
 
   try {
-    const client = generateClient();
-    const res = (await client.graphql({
-      query: COMPLETE_RANKED_MATCH,
-      variables: vars,
-    })) as { data?: CompleteRankedMatchResponse; errors?: Array<{ message: string }> };
+    // Reported as the winner; the server only accepts a participant (H1 P1).
+    const res = await gql<CompleteRankedMatchResponse>(winnerId, COMPLETE_RANKED_MATCH, vars);
 
     if (res.errors?.length) {
       throw new Error(res.errors[0]!.message);

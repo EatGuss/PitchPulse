@@ -3,8 +3,8 @@
  * Falls back to localRoomStore when AWS env vars are not set (/demo local).
  */
 
-import { generateClient } from 'aws-amplify/api';
 import { MATCH_ID, isAwsMode } from './config';
+import { VIEWER, gql, gqlSubscribe, type SessionUser } from './session';
 import { CREATE_ROOM, JOIN_ROOM, POST_COMMENT, SUB_ROOM_COMMENT, SUB_ROOM_MEMBER_JOINED } from './operations';
 import type { JoinRoomPayload, RoomComment, WatchRoomSession } from '../domain/watchRoomTypes';
 import {
@@ -22,13 +22,6 @@ import {
   subscribeLocalMemberJoined,
 } from '../sim/localRoomStore';
 import { clearMinimizedWatchRoom } from '../sim/watchRoomMinimizedStore';
-
-interface SubscriptionLike<T> {
-  subscribe: (handlers: {
-    next: (value: { data: T }) => void;
-    error?: (err: unknown) => void;
-  }) => { unsubscribe: () => void };
-}
 
 interface CreateRoomResponse {
   createRoom: {
@@ -56,13 +49,11 @@ export async function createWatchRoom(
     return localCreateRoom(userId, displayName, matchId);
   }
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: CREATE_ROOM,
-    variables: {
-      input: { matchId, userId, displayName },
-    },
-  })) as { data?: CreateRoomResponse };
+  // The server names the host from the verified token, not from userId/displayName.
+  const res = await gql<CreateRoomResponse>(userId as SessionUser, CREATE_ROOM, {
+    input: { matchId },
+  });
+  if (res.errors?.length) throw new Error(res.errors[0]!.message);
 
   const room = res.data?.createRoom;
   if (!room) throw new Error('createRoom returned no data');
@@ -94,13 +85,9 @@ export async function joinWatchRoom(
     return joinPayloadToSession(localJoinRoom(inviteCode, userId, displayName));
   }
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: JOIN_ROOM,
-    variables: {
-      input: { inviteCode, userId, displayName },
-    },
-  })) as { data?: JoinRoomResponse; errors?: Array<{ message: string }> };
+  const res = await gql<JoinRoomResponse>(userId as SessionUser, JOIN_ROOM, {
+    input: { inviteCode },
+  });
 
   if (res.errors?.length) {
     throw new Error(res.errors[0]!.message);
@@ -129,22 +116,17 @@ export function subscribeWatchRoomMembers(
     return subscribeLocalMemberJoined(roomId, onUpdate);
   }
 
-  const client = generateClient();
-  const obs = client.graphql({
-    query: SUB_ROOM_MEMBER_JOINED,
-    variables: { roomId },
-  }) as unknown as SubscriptionLike<{ roomMemberJoined: JoinRoomPayload }>;
-
-  const sub = obs.subscribe({
-    next: ({ data }) => {
-      if (data?.roomMemberJoined) onUpdate(data.roomMemberJoined);
+  return gqlSubscribe<{ roomMemberJoined: JoinRoomPayload }>(
+    VIEWER,
+    SUB_ROOM_MEMBER_JOINED,
+    { roomId },
+    {
+      next: (data) => {
+        if (data?.roomMemberJoined) onUpdate(data.roomMemberJoined);
+      },
+      error: (err) => console.error('[room-client] roomMemberJoined subscription error', err),
     },
-    error: (err) => {
-      console.error('[room-client] roomMemberJoined subscription error', err);
-    },
-  });
-
-  return () => sub.unsubscribe();
+  );
 }
 
 export async function postRoomComment(
@@ -160,18 +142,9 @@ export async function postRoomComment(
     return localPostComment(roomId, promptId, userId, validated.text);
   }
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: POST_COMMENT,
-    variables: {
-      input: {
-        roomId,
-        promptId,
-        userId,
-        text: validated.text,
-      },
-    },
-  })) as { data?: { postComment: RoomComment }; errors?: Array<{ message: string }> };
+  const res = await gql<{ postComment: RoomComment }>(userId as SessionUser, POST_COMMENT, {
+    input: { roomId, promptId, text: validated.text },
+  });
 
   if (res.errors?.length) {
     throw new Error(res.errors[0]!.message);
@@ -192,22 +165,17 @@ export function subscribeRoomComments(
     return subscribeLocalComments(roomId, promptId, onComment);
   }
 
-  const client = generateClient();
-  const obs = client.graphql({
-    query: SUB_ROOM_COMMENT,
-    variables: { roomId, promptId },
-  }) as unknown as SubscriptionLike<{ roomComment: RoomComment }>;
-
-  const sub = obs.subscribe({
-    next: ({ data }) => {
-      if (data?.roomComment) onComment(data.roomComment);
+  return gqlSubscribe<{ roomComment: RoomComment }>(
+    VIEWER,
+    SUB_ROOM_COMMENT,
+    { roomId, promptId },
+    {
+      next: (data) => {
+        if (data?.roomComment) onComment(data.roomComment);
+      },
+      error: (err) => console.error('[room-client] roomComment subscription error', err),
     },
-    error: (err) => {
-      console.error('[room-client] roomComment subscription error', err);
-    },
-  });
-
-  return () => sub.unsubscribe();
+  );
 }
 
 /** Copy invite code to clipboard; returns false if copy failed. */

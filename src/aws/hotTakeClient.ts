@@ -2,8 +2,8 @@
  * Hot Take — ranked-only vote multiplier + rival signal (Gate I).
  */
 
-import { generateClient } from 'aws-amplify/api';
 import { MATCH_ID, isAwsMode } from './config';
+import { VIEWER, gql, gqlSubscribe, type SessionUser } from './session';
 import {
   INIT_RANKED_HOT_TAKE,
   SIGNAL_HOT_TAKE,
@@ -18,27 +18,15 @@ import {
   subscribeHotTakeSignaled,
 } from '../sim/hotTakeStore';
 
-interface SubscriptionLike<T> {
-  subscribe: (handlers: {
-    next: (value: { data: T }) => void;
-    error?: (err: unknown) => void;
-  }) => { unsubscribe: () => void };
-}
-
 export async function initRankedHotTakes(matchId: string, userIds: string[]): Promise<void> {
   for (const userId of userIds) {
     initRankedHotTakeState(matchId, userId);
   }
   if (!isAwsMode) return;
 
-  const client = generateClient();
+  // Each player initialises their own budget; the server acts as the token's user.
   await Promise.all(
-    userIds.map((userId) =>
-      client.graphql({
-        query: INIT_RANKED_HOT_TAKE,
-        variables: { userId, matchId },
-      }),
-    ),
+    userIds.map((userId) => gql(userId as SessionUser, INIT_RANKED_HOT_TAKE, { matchId })),
   );
 }
 
@@ -52,14 +40,11 @@ export async function syncSubmitVote(
 ): Promise<void> {
   if (!isAwsMode) return;
 
-  const client = generateClient();
   try {
-    await client.graphql({
-      query: SUBMIT_VOTE,
-      variables: {
-        input: { matchId, promptId, userId, optionId, hotTake, rankedMode },
-      },
+    const res = await gql(userId as SessionUser, SUBMIT_VOTE, {
+      input: { matchId, promptId, optionId, hotTake, rankedMode },
     });
+    if (res.errors?.length) throw new Error(res.errors[0]!.message);
   } catch (err) {
     console.warn('[hotTake] submitVote AWS sync failed', err);
   }
@@ -82,12 +67,11 @@ export async function syncSignalHotTake(
 
   if (!isAwsMode) return;
 
-  const client = generateClient();
   try {
-    await client.graphql({
-      query: SIGNAL_HOT_TAKE,
-      variables: { input: signal },
+    const res = await gql(userId as SessionUser, SIGNAL_HOT_TAKE, {
+      input: { matchId, promptId, rivalUserId },
     });
+    if (res.errors?.length) throw new Error(res.errors[0]!.message);
   } catch (err) {
     console.warn('[hotTake] signalHotTake AWS sync failed', err);
   }
@@ -103,24 +87,23 @@ export function subscribeRivalHotTake(
 
   if (!isAwsMode) return offLocal;
 
-  const client = generateClient();
-  const obs = client.graphql({
-    query: SUB_RIVAL_HOT_TAKE,
-    variables: { rivalUserId },
-  }) as unknown as SubscriptionLike<{ rivalHotTakeSignal: HotTakeSignal }>;
-
-  const sub = obs.subscribe({
-    next: ({ data }) => {
-      const s = data?.rivalHotTakeSignal;
-      if (!s) return;
-      onSignal({ ...s, ts: Number(s.ts) });
+  const offAws = gqlSubscribe<{ rivalHotTakeSignal: HotTakeSignal }>(
+    VIEWER,
+    SUB_RIVAL_HOT_TAKE,
+    { rivalUserId },
+    {
+      next: (data) => {
+        const s = data?.rivalHotTakeSignal;
+        if (!s) return;
+        onSignal({ ...s, ts: Number(s.ts) });
+      },
+      error: (err) => console.warn('[hotTake] rival subscription error', err),
     },
-    error: (err) => console.warn('[hotTake] rival subscription error', err),
-  });
+  );
 
   return () => {
     offLocal();
-    sub.unsubscribe();
+    offAws();
   };
 }
 

@@ -18,5 +18,5 @@
     "types": ["node"]
   },
   "include": ["vite.config.ts", "scripts/**/*.ts"],
-  "exclude": ["scripts/verify-ranked-settlement.ts", "scripts/verify-prompt-engine.ts"]
+  "exclude": ["scripts/verify-ranked-settlement.ts", "scripts/verify-prompt-engine.ts", "scripts/verify-graphql.ts"]
 }

@@ -23,8 +23,10 @@
  *     2-second match-tick cadence runs inside the Lambda invocation loop).
  *
  *   Cognito
- *     Identity Pool with anonymous access. Unauthenticated role granted
- *     appsync:GraphQL on the client-callable mutations + subscriptions.
+ *     User Pool with the demo accounts alice, bob and operator (group
+ *     "operators"), sharing one password read from SSM at deploy time.
+ *     Clients call AppSync with an ID token via the AWS_LAMBDA authorizer;
+ *     there is no anonymous access. Server Lambdas use IAM.
  *
  * Hackathon-data S3 bucket access:
  *   The sim-emitter Lambda reads two specific objects out of the existing
@@ -40,7 +42,6 @@ import {
   Stack,
   type StackProps,
   CfnOutput,
-  Expiration,
 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -53,6 +54,8 @@ import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cr from 'aws-cdk-lib/custom-resources';
+import { CustomResource } from 'aws-cdk-lib';
 
 // ─── Hackathon constants ───────────────────────────────────────────────────
 
@@ -63,6 +66,14 @@ const MATCH_EVENTS_KEY = 'Challenge 3 – A Real Time Social Match Experience/da
 const MATCH_INFO_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/MatchInformations_Anonym.xml';
 const MATCH_ID = 'DFL-MAT-000001';
 const SEASON_WEEKS = '8';
+/** SSM SecureString holding the shared demo password. Create it before deploying. */
+const DEFAULT_DEMO_PASSWORD_PARAM = '/pitchpulse/demo-password';
+const OPERATORS_GROUP = 'operators';
+const DEMO_USERS = [
+  { username: 'alice', name: 'Alice', groups: [] as string[] },
+  { username: 'bob', name: 'Bob', groups: [] as string[] },
+  { username: 'operator', name: 'Match operator', groups: [OPERATORS_GROUP] },
+];
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CDK_ROOT = path.resolve(__dirname, '..');
@@ -301,6 +312,86 @@ export class PitchPulseStack extends Stack {
     });
     usersTable.grantReadWriteData(seasonResetFn);
 
+    // ─── Cognito User Pool + demo accounts ─────────────────────────────
+
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      userPoolName: 'pitchpulse-demo',
+      selfSignUpEnabled: false,
+      signInAliases: { username: true },
+      passwordPolicy: { minLength: 12, requireSymbols: false },
+      accountRecovery: cognito.AccountRecovery.NONE,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+    const userPoolClient = userPool.addClient('WebClient', {
+      authFlows: { userPassword: true },
+      generateSecret: false,
+      preventUserExistenceErrors: true,
+      idTokenValidity: Duration.hours(1),
+      refreshTokenValidity: Duration.days(1),
+    });
+    new cognito.CfnUserPoolGroup(this, 'OperatorsGroup', {
+      userPoolId: userPool.userPoolId,
+      groupName: OPERATORS_GROUP,
+      description: 'May start and reset the shared match clock.',
+    });
+
+    const demoPasswordParam =
+      (this.node.tryGetContext('demoPasswordParam') as string | undefined) ??
+      DEFAULT_DEMO_PASSWORD_PARAM;
+
+    const demoUsersFn = new lambdaNodejs.NodejsFunction(this, 'DemoUsersFn', {
+      ...fnDefaults,
+      functionName: 'pp-demo-users',
+      entry: path.join(CDK_ROOT, 'lambda', 'demo-users', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(30),
+      memorySize: 256,
+    });
+    demoUsersFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'cognito-idp:AdminGetUser',
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+          'cognito-idp:AdminAddUserToGroup',
+        ],
+        resources: [userPool.userPoolArn],
+      }),
+    );
+    demoUsersFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/${demoPasswordParam.replace(/^\//, '')}`,
+        ],
+      }),
+    );
+    const demoUsers = new CustomResource(this, 'DemoUsers', {
+      serviceToken: new cr.Provider(this, 'DemoUsersProvider', { onEventHandler: demoUsersFn })
+        .serviceToken,
+      properties: {
+        UserPoolId: userPool.userPoolId,
+        PasswordParameterName: demoPasswordParam,
+        Users: JSON.stringify(DEMO_USERS),
+        // Re-run on every deploy so a rotated SSM value takes effect.
+        Nonce: Date.now().toString(),
+      },
+    });
+    demoUsers.node.addDependency(userPool);
+
+    const authorizerFn = new lambdaNodejs.NodejsFunction(this, 'AuthorizerFn', {
+      ...fnDefaults,
+      functionName: 'pp-authorizer',
+      entry: path.join(CDK_ROOT, 'lambda', 'authorizer', 'index.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(5),
+      memorySize: 256,
+      environment: {
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+      },
+    });
+
     // ─── AppSync GraphQL API ───────────────────────────────────────────
 
     const api = new appsync.GraphqlApi(this, 'Api', {
@@ -309,13 +400,15 @@ export class PitchPulseStack extends Stack {
         path.join(CDK_ROOT, 'schema', 'schema.graphql'),
       ),
       authorizationConfig: {
+        // IAM: server Lambdas only (per-field grants below).
         defaultAuthorization: { authorizationType: appsync.AuthorizationType.IAM },
+        // Clients: Cognito ID token verified by lambda/authorizer.
         additionalAuthorizationModes: [
           {
-            authorizationType: appsync.AuthorizationType.API_KEY,
-            apiKeyConfig: {
-              description: 'Console / debugging key (NOT used by the frontend).',
-              expires: Expiration.after(Duration.days(365)),
+            authorizationType: appsync.AuthorizationType.LAMBDA,
+            lambdaAuthorizerConfig: {
+              handler: authorizerFn,
+              resultsCacheTtl: Duration.minutes(5),
             },
           },
         ],
@@ -355,7 +448,6 @@ export class PitchPulseStack extends Stack {
     // ─── AppSync data sources ──────────────────────────────────────────
 
     const noneDS = api.addNoneDataSource('NoneDS');
-    const roomsDS = api.addDynamoDbDataSource('RoomsDS', roomsTable);
     const promptsDS = api.addDynamoDbDataSource('PromptsDS', promptsTable);
     const startMatchDS = api.addLambdaDataSource('StartMatchDS', startMatchFn);
     const roomHandlerDS = api.addLambdaDataSource('RoomHandlerDS', roomHandlerFn);
@@ -382,11 +474,10 @@ export class PitchPulseStack extends Stack {
       code: appsync.Code.fromAsset(path.join(resolverRoot, 'publishMatchEvent.js')),
     });
 
-    roomsDS.createResolver('FireReactionResolver', {
+    // In room-handler (not a DynamoDB resolver) so it can check membership.
+    roomHandlerDS.createResolver('FireReactionResolver', {
       typeName: 'Mutation',
       fieldName: 'fireReaction',
-      runtime: jsRuntime,
-      code: appsync.Code.fromAsset(path.join(resolverRoot, 'fireReaction.js')),
     });
 
     voteHandlerDS.createResolver('SubmitVoteResolver', {
@@ -519,80 +610,6 @@ export class PitchPulseStack extends Stack {
       targets: [new eventsTargets.LambdaFunction(seasonResetFn)],
     });
 
-    // ─── Cognito Identity Pool (anonymous access) ──────────────────────
-
-    const identityPool = new cognito.CfnIdentityPool(this, 'IdentityPool', {
-      identityPoolName: 'pitchpulse_demo',
-      allowUnauthenticatedIdentities: true,
-      // No user pool: this is a pure anonymous-only pool. alice/bob are
-      // distinguished client-side via a localStorage userId — they share the
-      // same Cognito identity.
-    });
-
-    const unauthRole = new iam.Role(this, 'CognitoUnauthRole', {
-      assumedBy: new iam.FederatedPrincipal(
-        'cognito-identity.amazonaws.com',
-        {
-          StringEquals: {
-            'cognito-identity.amazonaws.com:aud': identityPool.ref,
-          },
-          'ForAnyValue:StringLike': {
-            'cognito-identity.amazonaws.com:amr': 'unauthenticated',
-          },
-        },
-        'sts:AssumeRoleWithWebIdentity',
-      ),
-      description: 'Anonymous PitchPulse viewers - AppSync mutations + subscriptions only.',
-    });
-
-    unauthRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ['appsync:GraphQL'],
-        resources: [
-          // Client-callable mutations
-          `${api.arn}/types/Mutation/fields/startMatch`,
-          `${api.arn}/types/Mutation/fields/resetMatch`,
-          `${api.arn}/types/Mutation/fields/fireReaction`,
-          `${api.arn}/types/Mutation/fields/submitVote`,
-          `${api.arn}/types/Mutation/fields/signalHotTake`,
-          `${api.arn}/types/Mutation/fields/initRankedHotTake`,
-          `${api.arn}/types/Mutation/fields/createRoom`,
-          `${api.arn}/types/Mutation/fields/joinRoom`,
-          `${api.arn}/types/Mutation/fields/postComment`,
-          `${api.arn}/types/Mutation/fields/leaveRoom`,
-          `${api.arn}/types/Mutation/fields/findRankedMatch`,
-          `${api.arn}/types/Mutation/fields/lockInRankedMatch`,
-          `${api.arn}/types/Mutation/fields/equipTitle`,
-          `${api.arn}/types/Mutation/fields/unlockHotTakeHero`,
-          `${api.arn}/types/Mutation/fields/completeRankedMatch`,
-          // Client-receivable queries (Gate B)
-          `${api.arn}/types/Query/fields/weeklyLeaderboard`,
-          `${api.arn}/types/Query/fields/seasonalLeaderboard`,
-          `${api.arn}/types/Query/fields/userStats`,
-          `${api.arn}/types/Query/fields/rankedMatchdayStatus`,
-          // Client-receivable subscriptions
-          `${api.arn}/types/Subscription/fields/matchClock`,
-          `${api.arn}/types/Subscription/fields/matchEvent`,
-          `${api.arn}/types/Subscription/fields/roomReaction`,
-          `${api.arn}/types/Subscription/fields/voteSubmitted`,
-          `${api.arn}/types/Subscription/fields/roomMemberJoined`,
-          `${api.arn}/types/Subscription/fields/roomComment`,
-          `${api.arn}/types/Subscription/fields/roomLeaderboardUpdate`,
-          `${api.arn}/types/Subscription/fields/tierPromoted`,
-          `${api.arn}/types/Subscription/fields/titleUnlocked`,
-          `${api.arn}/types/Subscription/fields/rivalHotTakeSignal`,
-          `${api.arn}/types/Subscription/fields/leaderboardUpdated`,
-          // Schema sanity check
-          `${api.arn}/types/Query/fields/ping`,
-        ],
-      }),
-    );
-
-    new cognito.CfnIdentityPoolRoleAttachment(this, 'IdentityPoolRoles', {
-      identityPoolId: identityPool.ref,
-      roles: { unauthenticated: unauthRole.roleArn },
-    });
-
     // ─── Outputs (consumed by the frontend's .env.production) ──────────
 
     new CfnOutput(this, 'AppSyncGraphQLUrl', {
@@ -604,11 +621,15 @@ export class PitchPulseStack extends Stack {
       description: 'AppSync real-time (WebSocket) URL - derived; Amplify infers this automatically.',
     });
     new CfnOutput(this, 'AppSyncApiId', { value: api.apiId });
-    new CfnOutput(this, 'AppSyncApiKey', {
-      value: api.apiKey ?? 'NONE',
-      description: 'Console / debugging API key. NOT used by the frontend.',
+    new CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
+    new CfnOutput(this, 'UserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+      description: 'Frontend VITE_COGNITO_USER_POOL_CLIENT_ID.',
     });
-    new CfnOutput(this, 'IdentityPoolId', { value: identityPool.ref });
+    new CfnOutput(this, 'DemoPasswordParameter', {
+      value: demoPasswordParam,
+      description: 'SSM SecureString with the shared demo password (set by the deployer).',
+    });
     new CfnOutput(this, 'Region', { value: this.region });
     new CfnOutput(this, 'MatchId', { value: MATCH_ID });
     new CfnOutput(this, 'SeasonWeeks', { value: SEASON_WEEKS });

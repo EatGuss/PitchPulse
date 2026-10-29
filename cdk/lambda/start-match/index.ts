@@ -8,6 +8,7 @@
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { AppSyncResolverEvent } from 'aws-lambda';
+import { callerFrom, requireOperator } from '../shared/identity';
 
 const REGION = process.env.AWS_REGION ?? 'eu-central-1';
 const MATCHES_TABLE = required('MATCHES_TABLE');
@@ -35,6 +36,9 @@ interface StartMatchResult {
 export const handler = async (
   event: AppSyncResolverEvent<StartMatchArgs>,
 ): Promise<StartMatchResult> => {
+  // The authorizer already denies these fields to non-operators; checked again
+  // here so the Lambda is safe even if the API's auth wiring changes.
+  requireOperator(callerFrom(event));
   const { matchId } = event.arguments.input;
   const now = Date.now();
 

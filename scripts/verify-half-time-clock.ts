@@ -60,7 +60,8 @@ const htIdx = events.findIndex((e) => e.type === 'halfTime');
 const ko2Idx = events.findIndex((e) => e.kickOffRole === 'secondHalfStart');
 const htMin = events[htIdx]?.matchMinute ?? 45.03;
 
-for (const mm of [44, 45, 45.01, 45.02, 45.03]) {
+// Tick through the stoppage slots up to this dataset's whistle minute.
+for (const mm of [44, 45, 45.01, 45.02, 45.03, htMin]) {
   drain(Math.min(mm, htMin));
 }
 

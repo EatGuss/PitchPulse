@@ -1,0 +1,71 @@
+.dsi {
+  flex: 1;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--pp-bg);
+  color: var(--pp-text);
+  font-family: var(--pp-font-sans);
+}
+
+.dsi__card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-r-lg);
+}
+
+.dsi__title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.dsi__sub {
+  margin: 0 0 6px;
+  color: var(--pp-text-muted);
+  font-size: 14px;
+}
+
+.dsi__label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pp-text-faint);
+}
+
+.dsi__input {
+  padding: 10px 12px;
+  border-radius: var(--pp-r-md);
+  border: 1px solid var(--pp-border-strong);
+  background: var(--pp-surface-2);
+  color: var(--pp-text);
+  font-size: 16px;
+}
+
+.dsi__error {
+  margin: 0;
+  color: var(--pp-danger);
+  font-size: 14px;
+}
+
+.dsi__btn {
+  margin-top: 6px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: var(--pp-r-md);
+  background: var(--pp-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.dsi__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -2,11 +2,11 @@
  * titleUnlocked subscription (AWS) — mirrors local titleUnlockEngine bus.
  */
 
-import { generateClient } from 'aws-amplify/api';
 import type { DemoUserId } from '../data/personas';
 import { titleUnlockLabel } from '../domain/titleRules';
 import { isAwsMode } from './config';
 import { SUB_TITLE_UNLOCKED } from './operations';
+import { gqlSubscribe } from './session';
 import { localUnlockTitle } from '../sim/localProfileStore';
 import type { TitleUnlock } from '../sim/titleUnlockEngine';
 import { emitTitleUnlock } from '../sim/titleUnlockEngine';
@@ -21,17 +21,8 @@ export function subscribeTitleUnlocked(
 ): () => void {
   if (!isAwsMode) return () => {};
 
-  const client = generateClient();
-  const sub = (
-    client.graphql({
-      query: SUB_TITLE_UNLOCKED,
-      variables: { userId },
-    }) as { subscribe: (handlers: {
-      next: (v: { data?: SubPayload }) => void;
-      error?: (err: unknown) => void;
-    }) => { unsubscribe: () => void } }
-  ).subscribe({
-    next: ({ data }) => {
+  return gqlSubscribe<SubPayload>(userId, SUB_TITLE_UNLOCKED, { userId }, {
+    next: (data) => {
       const evt = data?.titleUnlocked;
       if (!evt || evt.userId !== userId) return;
       localUnlockTitle(userId, evt.titleId);
@@ -44,8 +35,6 @@ export function subscribeTitleUnlocked(
     },
     error: (err) => console.warn('[title] subscription error', err),
   });
-
-  return () => sub.unsubscribe();
 }
 
 /** After AWS equip/unlock paths — surface toast on this device. */

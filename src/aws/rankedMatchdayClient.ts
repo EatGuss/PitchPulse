@@ -2,7 +2,6 @@
  * Ranked matchday lock-in + status — local store with AWS sync (Gate E).
  */
 
-import { generateClient } from 'aws-amplify/api';
 import type { DemoUserId } from '../data/personas';
 import { DEMO_MATCHDAY_ID, type MatchdayScheduleContext } from '../domain/matchday';
 import {
@@ -12,6 +11,7 @@ import {
 } from '../sim/matchdayStore';
 import { isAwsMode } from './config';
 import { LOCK_IN_RANKED_MATCH, RANKED_MATCHDAY_STATUS } from './operations';
+import { gql } from './session';
 
 interface RankedMatchdayStatusPayload {
   matchdayId: string;
@@ -76,11 +76,9 @@ function applyLockInResponse(userId: DemoUserId, status: RankedMatchdayStatusPay
 export async function syncRankedMatchdayFromServer(userId: DemoUserId): Promise<void> {
   if (!isAwsMode) return;
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: RANKED_MATCHDAY_STATUS,
-    variables: { userId, matchdayId: DEMO_MATCHDAY_ID },
-  })) as { data?: RankedMatchdayStatusResponse };
+  const res = await gql<RankedMatchdayStatusResponse>(userId, RANKED_MATCHDAY_STATUS, {
+    matchdayId: DEMO_MATCHDAY_ID,
+  });
 
   const status = res.data?.rankedMatchdayStatus;
   if (!status) return;
@@ -115,18 +113,9 @@ export async function syncAwsLockIn(
 ): Promise<void> {
   if (!isAwsMode) return;
 
-  const client = generateClient();
-  const res = (await client.graphql({
-    query: LOCK_IN_RANKED_MATCH,
-    variables: {
-      input: {
-        userId,
-        matchdayId: DEMO_MATCHDAY_ID,
-        fixtureId,
-        fixtureLabel,
-      },
-    },
-  })) as { data?: LockInRankedResponse; errors?: Array<{ message: string }> };
+  const res = await gql<LockInRankedResponse>(userId, LOCK_IN_RANKED_MATCH, {
+    input: { matchdayId: DEMO_MATCHDAY_ID, fixtureId, fixtureLabel },
+  });
 
   if (res.errors?.length) {
     throw new Error(res.errors[0]!.message);
