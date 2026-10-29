@@ -182,13 +182,15 @@ export class PromptEngine {
     if (!this.users.has(userId)) return false;
 
     const hotTake = Boolean(opts?.hotTake);
+    // A re-pick on a prompt that is already Hot Take must not spend another one.
+    const wasHot = a.userHotTakes?.[userId] === true;
     if (hotTake) {
       if (!this.rankedScoring) return false;
       const matchId = opts?.matchId;
       if (!matchId) return false;
       if (this.otherUserHasHotTake(a, userId)) return false;
       if (!claimPromptHotTake(matchId, a.id, userId)) return false;
-      if (!consumeHotTake(matchId, userId)) {
+      if (!wasHot && !consumeHotTake(matchId, userId)) {
         releasePromptHotTake(matchId, a.id, userId);
         return false;
       }
@@ -202,6 +204,9 @@ export class PromptEngine {
       a.userHotTakes[userId] = true;
     } else {
       a.userHotTakes[userId] = false;
+      // Dropping Hot Take by re-voting plain gives the spent one back, like
+      // setVoteHotTake(false) does.
+      if (wasHot && matchId) refundHotTake(matchId, userId);
       if (matchId && getPromptHotTakeClaim(matchId, a.id) === userId) {
         releasePromptHotTake(matchId, a.id, userId);
       }
@@ -320,6 +325,13 @@ export class PromptEngine {
       for (const tpl of PROMPT_TEMPLATES) {
         if (tpl.trigger.kind === 'onHalfTime') this.tryFire(tpl, ev.matchMinute);
       }
+    }
+
+    // The sim stops ticking after full time and prompts only lock on a running
+    // clock, so close the window here or the prompt would stay open forever.
+    if (ev.type === 'fullTime' && this.active && this.active.state === 'open') {
+      this.active.state = 'locked';
+      this.bus.emit('promptClosed', { prompt: this.snapshot(this.active) });
     }
 
     // Re-attempt resolution if window has already closed.

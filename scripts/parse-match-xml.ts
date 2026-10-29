@@ -19,7 +19,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -583,6 +583,28 @@ function parseEvents(): { events: NormalizedEvent[]; firstKickoffIso: string; se
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 function main(): void {
+  // The DFL XML is licensed and gitignored, so a fresh clone has neither the
+  // source nor the derived JSON. Reuse derived files if present; otherwise
+  // stop with instructions instead of a stack trace (predev/prebuild run this).
+  if (!existsSync(EVENTS_XML) || !existsSync(INFO_XML)) {
+    if (existsSync(OUT_EVENTS) && existsSync(OUT_INFO)) {
+      console.log('[parse-match-xml] source XML not found — keeping existing public/*.json');
+      return;
+    }
+    console.error(
+      [
+        '[parse-match-xml] Match data is missing.',
+        '  The app (local AND AWS mode) loads public/events.json and public/match-info.json,',
+        '  which are generated from the DFL hackathon XML. That data is not in git.',
+        '  Copy both files from s3://hackathon-data-058755927272 into data/Match-Events/:',
+        `    ${EVENTS_XML}`,
+        `    ${INFO_XML}`,
+        '  then run `npm run parse` (see README: "How to run locally").',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+
   console.log('[parse-match-xml] reading source XMLs...');
   const info = parseMatchInfo();
   const { events, firstKickoffIso, secondKickoffIso } = parseEvents();

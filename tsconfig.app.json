@@ -25,5 +25,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "scripts/verify-ranked-settlement.ts"]
+  "include": ["src", "scripts/verify-ranked-settlement.ts", "scripts/verify-prompt-engine.ts"]
 }
