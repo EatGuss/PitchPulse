@@ -18,6 +18,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import type { AppSyncResolverEvent } from 'aws-lambda';
+import { callerFrom } from '../shared/identity';
 import {
   appsyncMutation,
   NOTIFY_TIER_PROMOTED,
@@ -109,28 +110,35 @@ interface RankedMatchdayRecord {
 }
 
 export const handler = async (event: AppSyncResolverEvent<Record<string, unknown>>) => {
+  // Every field acts as the verified caller; no userId arguments are accepted.
+  const { userId } = callerFrom(event);
   switch (event.info.fieldName) {
     case 'findRankedMatch':
-      return findRankedMatch(event.arguments.userId as string);
+      return findRankedMatch(userId);
     case 'rankedMatchdayStatus':
       return rankedMatchdayStatus(
-        event.arguments.userId as string,
+        userId,
         (event.arguments.matchdayId as string) ?? DEMO_MATCHDAY_ID,
       );
     case 'lockInRankedMatch': {
       const input = event.arguments.input as {
-        userId: string;
         matchdayId: string;
         fixtureId: string;
         fixtureLabel: string;
       };
-      return lockInRankedMatch(input.userId, input.matchdayId, input.fixtureId, input.fixtureLabel);
+      return lockInRankedMatch(userId, input.matchdayId, input.fixtureId, input.fixtureLabel);
     }
     case 'equipTitle':
-      return equipTitle(event.arguments.userId as string, event.arguments.titleId as string);
+      return equipTitle(userId, event.arguments.titleId as string);
     case 'unlockHotTakeHero':
-      return unlockHotTakeHero(event.arguments.userId as string);
-    case 'completeRankedMatch':
+      return unlockHotTakeHero(userId);
+    case 'completeRankedMatch': {
+      // Interim until the server settles matches itself (H1 phase P4): only a
+      // participant may report a result. The points are still client-reported.
+      const { winnerId, loserId } = event.arguments as { winnerId: string; loserId: string };
+      if (userId !== winnerId && userId !== loserId) {
+        throw new Error('Forbidden: only a participant can complete this match');
+      }
       return completeRankedMatch(
         event.arguments.matchId as string,
         event.arguments.winnerId as string,
@@ -146,6 +154,7 @@ export const handler = async (event: AppSyncResolverEvent<Record<string, unknown
           loserPointsAtHalfTime: event.arguments.loserPointsAtHalfTime as number | undefined,
         },
       );
+    }
     default:
       throw new Error(`Unsupported field: ${event.info.fieldName}`);
   }

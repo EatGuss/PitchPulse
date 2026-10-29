@@ -2,8 +2,14 @@
 #
 # Real-time multiplayer pipeline. Mutations are the broadcast points; matching
 # subscriptions fan out via @aws_subscribe over pure WebSockets (Amplify SDK
-# default). Auth: IAM via Cognito Identity Pool (unauthenticated role) for the
-# client; server-side Lambdas use their execution role's IAM credentials.
+# default).
+#
+# Auth:
+#   @aws_lambda — clients. lambda/authorizer verifies a Cognito ID token; every
+#                 handler acts as that verified caller, so client inputs carry
+#                 no userId. startMatch/resetMatch are denied to non-operators.
+#   @aws_iam    — server Lambdas only (execution roles with per-field grants).
+#                 Fields marked only @aws_iam are server-only broadcasts.
 
 schema {
   query: Query
@@ -13,7 +19,7 @@ schema {
 
 # ─── Match clock + events (Pillar 2: real-time data) ─────────────────────────
 
-type MatchClock @aws_iam {
+type MatchClock @aws_iam @aws_lambda {
   matchId: ID!
   matchMinute: Float!
   displayClock: String!
@@ -24,7 +30,7 @@ type MatchClock @aws_iam {
   updatedAt: AWSTimestamp!
 }
 
-type MatchEvent @aws_iam {
+type MatchEvent @aws_iam @aws_lambda {
   matchId: ID!
   seq: Int!
   id: ID!
@@ -44,7 +50,7 @@ type MatchEvent @aws_iam {
 
 # ─── Watch room reactions (Pillar 1: multiplayer) ────────────────────────────
 
-type RoomReaction @aws_iam {
+type RoomReaction @aws_iam @aws_lambda {
   roomId: ID!
   reactionId: ID!
   userId: ID!
@@ -54,7 +60,7 @@ type RoomReaction @aws_iam {
 
 # ─── Vote + prompt broadcast (gamification persistence — Tier B in Gate 4) ───
 
-type Vote @aws_iam {
+type Vote @aws_iam @aws_lambda {
   matchId: ID!
   promptId: ID!
   userId: ID!
@@ -63,7 +69,7 @@ type Vote @aws_iam {
   votedAt: AWSTimestamp!
 }
 
-type HotTakeSignal @aws_iam {
+type HotTakeSignal @aws_iam @aws_lambda {
   matchId: ID!
   promptId: ID!
   userId: ID!
@@ -79,13 +85,13 @@ enum RoomStatus {
   ENDED
 }
 
-type RoomMember @aws_iam {
+type RoomMember @aws_iam @aws_lambda {
   userId: ID!
   displayName: String!
   joinedAt: AWSTimestamp!
 }
 
-type CreateRoomResult @aws_iam {
+type CreateRoomResult @aws_iam @aws_lambda {
   roomId: ID!
   inviteCode: String!
   roomName: String!
@@ -95,7 +101,7 @@ type CreateRoomResult @aws_iam {
   createdAt: AWSTimestamp!
 }
 
-type JoinRoomResult @aws_iam {
+type JoinRoomResult @aws_iam @aws_lambda {
   roomId: ID!
   inviteCode: String!
   roomName: String!
@@ -105,7 +111,7 @@ type JoinRoomResult @aws_iam {
   joinedMember: RoomMember!
 }
 
-type RoomComment @aws_iam {
+type RoomComment @aws_iam @aws_lambda {
   roomId: ID!
   commentId: ID!
   promptId: ID!
@@ -114,13 +120,13 @@ type RoomComment @aws_iam {
   ts: AWSTimestamp!
 }
 
-type RoomLeaderboardEntry @aws_iam {
+type RoomLeaderboardEntry @aws_iam @aws_lambda {
   userId: ID!
   displayName: String!
   coins: Int!
 }
 
-type RoomLeaderboardUpdate @aws_iam {
+type RoomLeaderboardUpdate @aws_iam @aws_lambda {
   roomId: ID!
   entries: [RoomLeaderboardEntry!]!
   updatedAt: AWSTimestamp!
@@ -136,13 +142,13 @@ enum Tier {
   CHAMPION
 }
 
-type Title @aws_iam {
+type Title @aws_iam @aws_lambda {
   id: ID!
   name: String!
   description: String!
 }
 
-type RankedOpponent @aws_iam {
+type RankedOpponent @aws_iam @aws_lambda {
   opponentId: ID!
   opponentName: String!
   opponentTier: Tier!
@@ -153,7 +159,7 @@ enum RankedMatchOutcome {
   DRAW
 }
 
-type RankedMatchResult @aws_iam {
+type RankedMatchResult @aws_iam @aws_lambda {
   matchId: ID!
   winnerId: ID!
   loserId: ID!
@@ -167,14 +173,14 @@ type RankedMatchResult @aws_iam {
   outcome: RankedMatchOutcome
 }
 
-type TierPromotedEvent @aws_iam {
+type TierPromotedEvent @aws_iam @aws_lambda {
   userId: ID!
   previousTier: Tier!
   newTier: Tier!
   ts: AWSTimestamp!
 }
 
-type TitleUnlockedEvent @aws_iam {
+type TitleUnlockedEvent @aws_iam @aws_lambda {
   userId: ID!
   titleId: ID!
   titleName: String!
@@ -214,14 +220,12 @@ input MatchEventInput {
 
 input FireReactionInput {
   roomId: ID!
-  userId: ID!
   emoji: String!
 }
 
 input SubmitVoteInput {
   matchId: ID!
   promptId: ID!
-  userId: ID!
   optionId: String!
   hotTake: Boolean
   rankedMode: Boolean
@@ -230,7 +234,6 @@ input SubmitVoteInput {
 input SignalHotTakeInput {
   matchId: ID!
   promptId: ID!
-  userId: ID!
   rivalUserId: ID!
 }
 
@@ -240,26 +243,20 @@ input StartMatchInput {
 
 input CreateRoomInput {
   matchId: ID!
-  userId: ID!
-  displayName: String!
 }
 
 input JoinRoomInput {
   inviteCode: String!
-  userId: ID!
-  displayName: String!
 }
 
 input PostCommentInput {
   roomId: ID!
   promptId: ID!
-  userId: ID!
   text: String!
 }
 
 input LeaveRoomInput {
   roomId: ID!
-  userId: ID!
 }
 
 input RoomLeaderboardUpdateInput {
@@ -274,7 +271,7 @@ input RoomLeaderboardEntryInput {
   coins: Int!
 }
 
-type StartMatchResult @aws_iam {
+type StartMatchResult @aws_iam @aws_lambda {
   matchId: ID!
   startedAtWallMs: AWSTimestamp!
   isRunning: Boolean!
@@ -282,7 +279,7 @@ type StartMatchResult @aws_iam {
 
 # ─── Ranked matchday commitment (Gate E) ─────────────────────────────────────
 
-type RankedMatchdayStatus @aws_iam {
+type RankedMatchdayStatus @aws_iam @aws_lambda {
   matchdayId: ID!
   lockedFixtureId: ID
   lockedFixtureLabel: String
@@ -291,7 +288,6 @@ type RankedMatchdayStatus @aws_iam {
 }
 
 input LockInRankedInput {
-  userId: ID!
   matchdayId: ID!
   fixtureId: ID!
   fixtureLabel: String!
@@ -304,7 +300,7 @@ enum LeaderboardPeriod {
   SEASONAL
 }
 
-type LeaderboardEntry @aws_iam {
+type LeaderboardEntry @aws_iam @aws_lambda {
   rank: Int!
   userId: ID!
   displayName: String!
@@ -313,14 +309,14 @@ type LeaderboardEntry @aws_iam {
   points: Int!
 }
 
-type LeaderboardUpdate @aws_iam {
+type LeaderboardUpdate @aws_iam @aws_lambda {
   period: LeaderboardPeriod!
   seasonNumber: Int
   isoWeek: String
   updatedAt: AWSTimestamp!
 }
 
-type UserStats @aws_iam {
+type UserStats @aws_iam @aws_lambda {
   userId: ID!
   weeklyPoints: Int!
   weeklyRank: Int
@@ -345,46 +341,41 @@ input LeaderboardUpdatedInput {
   updatedAt: AWSTimestamp!
 }
 
-type Query @aws_iam {
-  ping: String
-  weeklyLeaderboard(limit: Int): [LeaderboardEntry!]!
-  seasonalLeaderboard(seasonNumber: Int, limit: Int): [LeaderboardEntry!]!
-  userStats(userId: String!): UserStats
-  rankedMatchdayStatus(userId: ID!, matchdayId: ID!): RankedMatchdayStatus
+type Query {
+  ping: String @aws_iam @aws_lambda
+  weeklyLeaderboard(limit: Int): [LeaderboardEntry!]! @aws_iam @aws_lambda
+  seasonalLeaderboard(seasonNumber: Int, limit: Int): [LeaderboardEntry!]! @aws_iam @aws_lambda
+  # Public profile stats — any signed-in user may read anyone's.
+  userStats(userId: String!): UserStats @aws_iam @aws_lambda
+  # The caller's own ranked matchday status.
+  rankedMatchdayStatus(matchdayId: ID!): RankedMatchdayStatus @aws_lambda
 }
 
 # ─── Mutations ───────────────────────────────────────────────────────────────
 
-type Mutation @aws_iam {
-  startMatch(input: StartMatchInput!): StartMatchResult
-  resetMatch(input: StartMatchInput!): StartMatchResult
+type Mutation {
+  # Operator-only (authorizer deniedFields + start-match handler check)
+  startMatch(input: StartMatchInput!): StartMatchResult @aws_lambda
+  resetMatch(input: StartMatchInput!): StartMatchResult @aws_lambda
 
-  fireReaction(input: FireReactionInput!): RoomReaction
+  # Watch Room — client-callable, acting as the verified caller
+  fireReaction(input: FireReactionInput!): RoomReaction @aws_lambda
+  createRoom(input: CreateRoomInput!): CreateRoomResult @aws_lambda
+  joinRoom(input: JoinRoomInput!): JoinRoomResult @aws_lambda
+  postComment(input: PostCommentInput!): RoomComment @aws_lambda
+  leaveRoom(input: LeaveRoomInput!): Boolean @aws_lambda
 
-  submitVote(input: SubmitVoteInput!): Vote
-  signalHotTake(input: SignalHotTakeInput!): HotTakeSignal
-  initRankedHotTake(userId: ID!, matchId: ID!): Boolean
+  # Votes + Hot Take — client-callable, acting as the verified caller
+  submitVote(input: SubmitVoteInput!): Vote @aws_lambda
+  signalHotTake(input: SignalHotTakeInput!): HotTakeSignal @aws_lambda
+  initRankedHotTake(matchId: ID!): Boolean @aws_lambda
 
-  publishMatchClock(input: MatchClockInput!): MatchClock
-
-  publishMatchEvent(input: MatchEventInput!): MatchEvent
-
-  # Watch Room — client-callable
-  createRoom(input: CreateRoomInput!): CreateRoomResult
-  joinRoom(input: JoinRoomInput!): JoinRoomResult
-  postComment(input: PostCommentInput!): RoomComment
-  leaveRoom(input: LeaveRoomInput!): Boolean
-
-  # Watch Room — server-only broadcast (Gate E wiring)
-  publishRoomLeaderboard(input: RoomLeaderboardUpdateInput!): RoomLeaderboardUpdate
-
-  # Ranked + Titles — client-callable
-  findRankedMatch(userId: ID!): RankedOpponent
-  lockInRankedMatch(input: LockInRankedInput!): RankedMatchdayStatus
-  equipTitle(userId: ID!, titleId: String!): Boolean
-  unlockHotTakeHero(userId: ID!): Boolean
-
-  # Ranked + Titles — server-only broadcast
+  # Ranked + Titles — client-callable, acting as the verified caller
+  findRankedMatch: RankedOpponent @aws_lambda
+  lockInRankedMatch(input: LockInRankedInput!): RankedMatchdayStatus @aws_lambda
+  equipTitle(titleId: String!): Boolean @aws_lambda
+  unlockHotTakeHero: Boolean @aws_lambda
+  # Interim: caller must be winnerId or loserId. Moves server-side in H1 phase P4.
   completeRankedMatch(
     matchId: ID!
     winnerId: ID!
@@ -397,17 +388,20 @@ type Mutation @aws_iam {
     loserCorrectInMatch: Int
     winnerPointsAtHalfTime: Int
     loserPointsAtHalfTime: Int
-  ): RankedMatchResult
-  notifyTierPromoted(userId: ID!, previousTier: Tier!, newTier: Tier!, ts: AWSTimestamp!): TierPromotedEvent
-  notifyTitleUnlocked(userId: ID!, titleId: ID!, titleName: String!, ts: AWSTimestamp!): TitleUnlockedEvent
+  ): RankedMatchResult @aws_lambda
 
-  # Leaderboards — server-only broadcast (Gate B)
-  publishLeaderboardUpdated(input: LeaderboardUpdatedInput!): LeaderboardUpdate
+  # Server-only broadcasts (IAM: stream-handler / ranked-handler roles)
+  publishMatchClock(input: MatchClockInput!): MatchClock @aws_iam
+  publishMatchEvent(input: MatchEventInput!): MatchEvent @aws_iam
+  publishRoomLeaderboard(input: RoomLeaderboardUpdateInput!): RoomLeaderboardUpdate @aws_iam
+  notifyTierPromoted(userId: ID!, previousTier: Tier!, newTier: Tier!, ts: AWSTimestamp!): TierPromotedEvent @aws_iam
+  notifyTitleUnlocked(userId: ID!, titleId: ID!, titleName: String!, ts: AWSTimestamp!): TitleUnlockedEvent @aws_iam
+  publishLeaderboardUpdated(input: LeaderboardUpdatedInput!): LeaderboardUpdate @aws_iam
 }
 
 # ─── Subscriptions ───────────────────────────────────────────────────────────
 
-type Subscription @aws_iam {
+type Subscription @aws_lambda {
   matchClock(matchId: ID!): MatchClock
     @aws_subscribe(mutations: ["publishMatchClock"])
 

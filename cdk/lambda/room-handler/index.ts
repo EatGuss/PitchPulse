@@ -1,11 +1,14 @@
 /**
  * room-handler — AppSync Lambda data source for Watch Room mutations:
- *   createRoom, joinRoom, postComment, leaveRoom
+ *   createRoom, joinRoom, postComment, leaveRoom, fireReaction
+ *
+ * The acting user always comes from the verified caller (shared/identity),
+ * never from arguments. Comments and reactions require room membership.
  *
  * pp-rooms single-table layout (PK/SK):
  *   ROOM#<roomId> / META              — inviteCode, matchId, hostUserId, status, roomName
  *   ROOM#<roomId> / MEMBER#<userId>   — displayName, joinedAt
- *   ROOM#<roomId> / REACTION#<ts>#id  — userId, emoji (TTL 24h) — written by fireReaction resolver
+ *   ROOM#<roomId> / REACTION#<ts>#id  — userId, emoji (TTL 24h)
  *   ROOM#<roomId> / COMMENT#<ts>#id    — userId, promptId, text (TTL 24h)
  *
  * GSI InviteCodeIndex: inviteCode → room META lookup for joinRoom.
@@ -21,6 +24,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { unmarshall } from '@aws-sdk/util-dynamodb';
 import type { AppSyncResolverEvent } from 'aws-lambda';
+import { callerFrom, type Caller } from '../shared/identity';
 
 const REGION = process.env.AWS_REGION ?? 'eu-central-1';
 const ROOMS_TABLE = required('ROOMS_TABLE');
@@ -30,6 +34,8 @@ const TTL_SECONDS = 86400;
 
 const INVITE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_NAME_PREFIXES = ['FC Team', 'Club', 'Team', 'CLU'];
+/** Mirrors REACTION_EMOJIS in src/sim/watchRoomEngine.ts. */
+const REACTION_EMOJIS = ['🔥', '⚽', '😱', '🎉'];
 
 function required(name: string): string {
   const v = process.env[name];
@@ -58,15 +64,18 @@ interface RoomMeta {
 }
 
 export const handler = async (event: AppSyncResolverEvent<Record<string, unknown>>) => {
+  const caller = callerFrom(event);
   switch (event.info.fieldName) {
     case 'createRoom':
-      return createRoom(event.arguments.input as CreateRoomInput);
+      return createRoom(caller, event.arguments.input as CreateRoomInput);
     case 'joinRoom':
-      return joinRoom(event.arguments.input as JoinRoomInput);
+      return joinRoom(caller, event.arguments.input as JoinRoomInput);
     case 'postComment':
-      return postComment(event.arguments.input as PostCommentInput);
+      return postComment(caller, event.arguments.input as PostCommentInput);
     case 'leaveRoom':
-      return leaveRoom(event.arguments.input as LeaveRoomInput);
+      return leaveRoom(caller, event.arguments.input as LeaveRoomInput);
+    case 'fireReaction':
+      return fireReaction(caller, event.arguments.input as FireReactionInput);
     default:
       throw new Error(`Unsupported field: ${event.info.fieldName}`);
   }
@@ -74,26 +83,25 @@ export const handler = async (event: AppSyncResolverEvent<Record<string, unknown
 
 interface CreateRoomInput {
   matchId: string;
-  userId: string;
-  displayName: string;
 }
 
 interface JoinRoomInput {
   inviteCode: string;
-  userId: string;
-  displayName: string;
 }
 
 interface PostCommentInput {
   roomId: string;
   promptId: string;
-  userId: string;
   text: string;
 }
 
 interface LeaveRoomInput {
   roomId: string;
-  userId: string;
+}
+
+interface FireReactionInput {
+  roomId: string;
+  emoji: string;
 }
 
 function randomId(): string {
@@ -193,11 +201,27 @@ async function listMembers(roomId: string): Promise<RoomMember[]> {
   });
 }
 
-async function createRoom(input: CreateRoomInput) {
-  const { matchId, userId, displayName } = input;
-  if (!matchId || !userId || !displayName?.trim()) {
-    throw new Error('matchId, userId, and displayName are required');
+async function isMember(roomId: string, userId: string): Promise<boolean> {
+  const res = await ddb.send(
+    new GetItemCommand({
+      TableName: ROOMS_TABLE,
+      Key: { PK: { S: `ROOM#${roomId}` }, SK: { S: `MEMBER#${userId}` } },
+      ConsistentRead: true,
+    }),
+  );
+  return Boolean(res.Item);
+}
+
+async function requireMember(roomId: string, userId: string): Promise<void> {
+  if (!(await isMember(roomId, userId))) {
+    throw new Error('Forbidden: you are not a member of this room');
   }
+}
+
+async function createRoom(caller: Caller, input: CreateRoomInput) {
+  const { matchId } = input;
+  const { userId, displayName } = caller;
+  if (!matchId) throw new Error('matchId is required');
 
   const roomId = randomId();
   const inviteCode = await generateUniqueInviteCode();
@@ -249,11 +273,8 @@ async function createRoom(input: CreateRoomInput) {
   };
 }
 
-async function joinRoom(input: JoinRoomInput) {
-  const { userId, displayName } = input;
-  if (!userId || !displayName?.trim()) {
-    throw new Error('userId and displayName are required');
-  }
+async function joinRoom(caller: Caller, input: JoinRoomInput) {
+  const { userId, displayName } = caller;
 
   const inviteCode = normalizeInviteCode(input.inviteCode);
 
@@ -338,13 +359,15 @@ function validateCommentText(text: string): string {
   return trimmed;
 }
 
-async function postComment(input: PostCommentInput) {
-  const { roomId, promptId, userId } = input;
+async function postComment(caller: Caller, input: PostCommentInput) {
+  const { roomId, promptId } = input;
+  const { userId } = caller;
   const text = validateCommentText(input.text);
 
   const meta = await getRoomMeta(roomId);
   if (!meta) throw new Error('Room not found');
   if (meta.status === 'ENDED') throw new Error('Room has ended — comments are closed');
+  await requireMember(roomId, userId);
 
   const now = Date.now();
   const commentId = randomId();
@@ -370,8 +393,9 @@ async function postComment(input: PostCommentInput) {
   return { roomId, commentId, promptId, userId, text, ts: now };
 }
 
-async function leaveRoom(input: LeaveRoomInput) {
-  const { roomId, userId } = input;
+async function leaveRoom(caller: Caller, input: LeaveRoomInput) {
+  const { roomId } = input;
+  const { userId } = caller;
 
   const meta = await getRoomMeta(roomId);
   if (!meta) throw new Error('Room not found');
@@ -387,4 +411,31 @@ async function leaveRoom(input: LeaveRoomInput) {
   );
 
   return true;
+}
+
+async function fireReaction(caller: Caller, input: FireReactionInput) {
+  const { roomId, emoji } = input;
+  const { userId } = caller;
+  if (!REACTION_EMOJIS.includes(emoji)) throw new Error('Unsupported reaction');
+  await requireMember(roomId, userId);
+
+  const ts = Date.now();
+  const reactionId = randomId();
+  await ddb.send(
+    new PutItemCommand({
+      TableName: ROOMS_TABLE,
+      Item: {
+        PK: { S: `ROOM#${roomId}` },
+        SK: { S: `REACTION#${ts}#${reactionId}` },
+        roomId: { S: roomId },
+        reactionId: { S: reactionId },
+        userId: { S: userId },
+        emoji: { S: emoji },
+        ts: { N: String(ts) },
+        expiresAt: { N: String(Math.floor(ts / 1000) + TTL_SECONDS) },
+      },
+    }),
+  );
+
+  return { roomId, reactionId, userId, emoji, ts };
 }
