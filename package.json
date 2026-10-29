@@ -6,6 +6,7 @@
   "description": "Real-time social Bundesliga matchday companion — DFL Fan Squad hackathon submission.",
   "scripts": {
     "parse": "tsx scripts/parse-match-xml.ts",
+    "generate:synthetic": "tsx scripts/generate-synthetic-match.ts",
     "predev": "npm run parse",
     "prebuild": "npm run parse",
     "dev": "vite",
