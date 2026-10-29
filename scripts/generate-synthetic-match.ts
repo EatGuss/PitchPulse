@@ -143,7 +143,8 @@ goal(at1H(23.4), HOME, 9, 10); // inside the 20' "home to score in next 10" wind
 card(at1H(31.2), GUEST, 6, 'foul');
 card(at1H(43.8), GUEST, 4, 'foul'); // resolves the 40' "another card before HT" prompt → yes
 add(at1H(45), `<AdditionalTimeDisplayed${attrs({ GameSection: 'firstHalf', TimeAdditionTotal: 3 })}/>`);
-foul(at1H(45.9), HOME); // 45+ event, compressed into the stoppage slots by the parser
+foul(at1H(45.9), HOME); // 45+ events, compressed into the stoppage slots by the parser
+add(at1H(46.2), `<CornerKick${attrs({ Team: GUEST, Side: 'left' })}/>`);
 add(at1H(HALF_TIME_WHISTLE_OFFSET_MIN), `<FinalWhistle${attrs({ GameSection: 'firstHalf', FinalResult: '1:0' })}/>`);
 
 sub(KICKOFF_2H - 6 * 60_000, GUEST, 8, 14); // half-time window substitution

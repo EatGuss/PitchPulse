@@ -23,36 +23,37 @@
   <Event EventId="900019" EventTime="2026-05-16T14:13:48.000+00:00" MatchId="DFL-MAT-000001"><Caution Team="DFL-CLU-000002" Player="SYN-PLR-204" CardColor="yellow" Reason="foul"/></Event>
   <Event EventId="900020" EventTime="2026-05-16T14:15:00.000+00:00" MatchId="DFL-MAT-000001"><AdditionalTimeDisplayed GameSection="firstHalf" TimeAdditionTotal="3"/></Event>
   <Event EventId="900021" EventTime="2026-05-16T14:15:54.000+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-108" FoulType="foul"/></Event>
-  <Event EventId="900022" EventTime="2026-05-16T14:16:30.000+00:00" MatchId="DFL-MAT-000001"><FinalWhistle GameSection="firstHalf" FinalResult="1:0"/></Event>
-  <Event EventId="900023" EventTime="2026-05-16T14:25:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000002" PlayerOut="SYN-PLR-208" PlayerIn="SYN-PLR-214"/></Event>
-  <Event EventId="900024" EventTime="2026-05-16T14:31:30.000+00:00" MatchId="DFL-MAT-000001"><KickOff GameSection="secondHalf" TeamLeft="DFL-CLU-000002" TeamRight="DFL-CLU-000001"/></Event>
-  <Event EventId="900025" EventTime="2026-05-16T14:34:06.415+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-104" xG="0.22"><BlockedShot ShotOrigin="openPlay"/></ShotAtGoal></Event>
-  <Event EventId="900026" EventTime="2026-05-16T14:35:46.371+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="left"/></Event>
-  <Event EventId="900027" EventTime="2026-05-16T14:37:46.309+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-107" FoulType="foul"/></Event>
-  <Event EventId="900028" EventTime="2026-05-16T14:38:36.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000002" Player="SYN-PLR-211" xG="0.53"><SuccessfulShot CurrentResult="1:1" Assist="SYN-PLR-207"/></ShotAtGoal></Event>
-  <Event EventId="900029" EventTime="2026-05-16T14:40:17.602+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-107" xG="0.02"><SavedShot ShotOrigin="openPlay"/></ShotAtGoal></Event>
-  <Event EventId="900030" EventTime="2026-05-16T14:42:29.206+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000001" Side="left"/></Event>
-  <Event EventId="900031" EventTime="2026-05-16T14:45:39.895+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-209"><Pass/></Play></Event>
-  <Event EventId="900032" EventTime="2026-05-16T14:46:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000001" PlayerOut="SYN-PLR-107" PlayerIn="SYN-PLR-113"/></Event>
-  <Event EventId="900033" EventTime="2026-05-16T14:47:27.444+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-207" FoulType="foul"/></Event>
-  <Event EventId="900034" EventTime="2026-05-16T14:50:39.389+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="left"/></Event>
-  <Event EventId="900035" EventTime="2026-05-16T14:52:34.681+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-210"><Pass/></Play></Event>
-  <Event EventId="900036" EventTime="2026-05-16T14:55:06.622+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-203"><Pass/></Play></Event>
-  <Event EventId="900037" EventTime="2026-05-16T14:57:06.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000002" Player="SYN-PLR-209" xG="0.29"><SuccessfulShot CurrentResult="1:2"/></ShotAtGoal></Event>
-  <Event EventId="900038" EventTime="2026-05-16T14:58:09.763+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-204" FoulType="foul"/></Event>
-  <Event EventId="900039" EventTime="2026-05-16T14:59:51.120+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-105" FoulType="foul"/></Event>
-  <Event EventId="900040" EventTime="2026-05-16T15:02:48.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-111" xG="0.30"><SuccessfulShot CurrentResult="2:2" Assist="SYN-PLR-109"/></ShotAtGoal></Event>
-  <Event EventId="900041" EventTime="2026-05-16T15:03:16.558+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-104" FoulType="handBall"/></Event>
-  <Event EventId="900042" EventTime="2026-05-16T15:04:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000002" PlayerOut="SYN-PLR-210" PlayerIn="SYN-PLR-215"/></Event>
-  <Event EventId="900043" EventTime="2026-05-16T15:04:53.956+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000001" Player="SYN-PLR-103"><Pass/></Play></Event>
-  <Event EventId="900044" EventTime="2026-05-16T15:06:27.875+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="right"/></Event>
-  <Event EventId="900045" EventTime="2026-05-16T15:07:59.503+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-204" FoulType="foul"/></Event>
-  <Event EventId="900046" EventTime="2026-05-16T15:09:00.000+00:00" MatchId="DFL-MAT-000001"><Caution Team="DFL-CLU-000001" Player="SYN-PLR-105" CardColor="yellow" Reason="tactical"/></Event>
-  <Event EventId="900047" EventTime="2026-05-16T15:11:01.364+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-207" FoulType="handBall"/></Event>
-  <Event EventId="900048" EventTime="2026-05-16T15:13:42.000+00:00" MatchId="DFL-MAT-000001"><Penalty Team="DFL-CLU-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-109" xG="0.76"><SuccessfulShot CurrentResult="3:2"/></ShotAtGoal></Penalty></Event>
-  <Event EventId="900049" EventTime="2026-05-16T15:14:29.212+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-105" FoulType="handBall"/></Event>
-  <Event EventId="900050" EventTime="2026-05-16T15:16:26.849+00:00" MatchId="DFL-MAT-000001"><Offside Team="DFL-CLU-000001" Player="SYN-PLR-107"/></Event>
-  <Event EventId="900051" EventTime="2026-05-16T15:16:30.000+00:00" MatchId="DFL-MAT-000001"><AdditionalTimeDisplayed GameSection="secondHalf" TimeAdditionTotal="4"/></Event>
-  <Event EventId="900052" EventTime="2026-05-16T15:19:08.222+00:00" MatchId="DFL-MAT-000001"><Offside Team="DFL-CLU-000001" Player="SYN-PLR-104"/></Event>
-  <Event EventId="900053" EventTime="2026-05-16T15:20:30.000+00:00" MatchId="DFL-MAT-000001"><FinalWhistle GameSection="secondHalf" FinalResult="3:2"/></Event>
+  <Event EventId="900022" EventTime="2026-05-16T14:16:12.000+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="left"/></Event>
+  <Event EventId="900023" EventTime="2026-05-16T14:16:30.000+00:00" MatchId="DFL-MAT-000001"><FinalWhistle GameSection="firstHalf" FinalResult="1:0"/></Event>
+  <Event EventId="900024" EventTime="2026-05-16T14:25:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000002" PlayerOut="SYN-PLR-208" PlayerIn="SYN-PLR-214"/></Event>
+  <Event EventId="900025" EventTime="2026-05-16T14:31:30.000+00:00" MatchId="DFL-MAT-000001"><KickOff GameSection="secondHalf" TeamLeft="DFL-CLU-000002" TeamRight="DFL-CLU-000001"/></Event>
+  <Event EventId="900026" EventTime="2026-05-16T14:34:06.415+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-104" xG="0.22"><BlockedShot ShotOrigin="openPlay"/></ShotAtGoal></Event>
+  <Event EventId="900027" EventTime="2026-05-16T14:35:46.371+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="left"/></Event>
+  <Event EventId="900028" EventTime="2026-05-16T14:37:46.309+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-107" FoulType="foul"/></Event>
+  <Event EventId="900029" EventTime="2026-05-16T14:38:36.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000002" Player="SYN-PLR-211" xG="0.53"><SuccessfulShot CurrentResult="1:1" Assist="SYN-PLR-207"/></ShotAtGoal></Event>
+  <Event EventId="900030" EventTime="2026-05-16T14:40:17.602+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-107" xG="0.02"><SavedShot ShotOrigin="openPlay"/></ShotAtGoal></Event>
+  <Event EventId="900031" EventTime="2026-05-16T14:42:29.206+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000001" Side="left"/></Event>
+  <Event EventId="900032" EventTime="2026-05-16T14:45:39.895+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-209"><Pass/></Play></Event>
+  <Event EventId="900033" EventTime="2026-05-16T14:46:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000001" PlayerOut="SYN-PLR-107" PlayerIn="SYN-PLR-113"/></Event>
+  <Event EventId="900034" EventTime="2026-05-16T14:47:27.444+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-207" FoulType="foul"/></Event>
+  <Event EventId="900035" EventTime="2026-05-16T14:50:39.389+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="left"/></Event>
+  <Event EventId="900036" EventTime="2026-05-16T14:52:34.681+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-210"><Pass/></Play></Event>
+  <Event EventId="900037" EventTime="2026-05-16T14:55:06.622+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000002" Player="SYN-PLR-203"><Pass/></Play></Event>
+  <Event EventId="900038" EventTime="2026-05-16T14:57:06.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000002" Player="SYN-PLR-209" xG="0.29"><SuccessfulShot CurrentResult="1:2"/></ShotAtGoal></Event>
+  <Event EventId="900039" EventTime="2026-05-16T14:58:09.763+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-204" FoulType="foul"/></Event>
+  <Event EventId="900040" EventTime="2026-05-16T14:59:51.120+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-105" FoulType="foul"/></Event>
+  <Event EventId="900041" EventTime="2026-05-16T15:02:48.000+00:00" MatchId="DFL-MAT-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-111" xG="0.30"><SuccessfulShot CurrentResult="2:2" Assist="SYN-PLR-109"/></ShotAtGoal></Event>
+  <Event EventId="900042" EventTime="2026-05-16T15:03:16.558+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-104" FoulType="handBall"/></Event>
+  <Event EventId="900043" EventTime="2026-05-16T15:04:30.000+00:00" MatchId="DFL-MAT-000001"><Substitution Team="DFL-CLU-000002" PlayerOut="SYN-PLR-210" PlayerIn="SYN-PLR-215"/></Event>
+  <Event EventId="900044" EventTime="2026-05-16T15:04:53.956+00:00" MatchId="DFL-MAT-000001"><Play Team="DFL-CLU-000001" Player="SYN-PLR-103"><Pass/></Play></Event>
+  <Event EventId="900045" EventTime="2026-05-16T15:06:27.875+00:00" MatchId="DFL-MAT-000001"><CornerKick Team="DFL-CLU-000002" Side="right"/></Event>
+  <Event EventId="900046" EventTime="2026-05-16T15:07:59.503+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-204" FoulType="foul"/></Event>
+  <Event EventId="900047" EventTime="2026-05-16T15:09:00.000+00:00" MatchId="DFL-MAT-000001"><Caution Team="DFL-CLU-000001" Player="SYN-PLR-105" CardColor="yellow" Reason="tactical"/></Event>
+  <Event EventId="900048" EventTime="2026-05-16T15:11:01.364+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000002" Fouler="SYN-PLR-207" FoulType="handBall"/></Event>
+  <Event EventId="900049" EventTime="2026-05-16T15:13:42.000+00:00" MatchId="DFL-MAT-000001"><Penalty Team="DFL-CLU-000001"><ShotAtGoal Team="DFL-CLU-000001" Player="SYN-PLR-109" xG="0.76"><SuccessfulShot CurrentResult="3:2"/></ShotAtGoal></Penalty></Event>
+  <Event EventId="900050" EventTime="2026-05-16T15:14:29.212+00:00" MatchId="DFL-MAT-000001"><Foul TeamFouler="DFL-CLU-000001" Fouler="SYN-PLR-105" FoulType="handBall"/></Event>
+  <Event EventId="900051" EventTime="2026-05-16T15:16:26.849+00:00" MatchId="DFL-MAT-000001"><Offside Team="DFL-CLU-000001" Player="SYN-PLR-107"/></Event>
+  <Event EventId="900052" EventTime="2026-05-16T15:16:30.000+00:00" MatchId="DFL-MAT-000001"><AdditionalTimeDisplayed GameSection="secondHalf" TimeAdditionTotal="4"/></Event>
+  <Event EventId="900053" EventTime="2026-05-16T15:19:08.222+00:00" MatchId="DFL-MAT-000001"><Offside Team="DFL-CLU-000001" Player="SYN-PLR-104"/></Event>
+  <Event EventId="900054" EventTime="2026-05-16T15:20:30.000+00:00" MatchId="DFL-MAT-000001"><FinalWhistle GameSection="secondHalf" FinalResult="3:2"/></Event>
 </PutDataRequest>
