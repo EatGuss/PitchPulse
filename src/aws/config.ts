@@ -14,16 +14,16 @@
 const env = (import.meta as { env?: Partial<ImportMetaEnv> }).env;
 const url = env?.VITE_APPSYNC_URL;
 const region = env?.VITE_APPSYNC_REGION;
-const identityPoolId = env?.VITE_COGNITO_IDENTITY_POOL_ID;
+const userPoolClientId = env?.VITE_COGNITO_USER_POOL_CLIENT_ID;
 
 export const awsConfig = {
   url,
   region,
-  identityPoolId,
+  userPoolClientId,
 } as const;
 
 /** True iff every required AWS env var is set — used to feature-flag AWS mode. */
-export const isAwsMode = Boolean(url && region && identityPoolId);
+export const isAwsMode = Boolean(url && region && userPoolClientId);
 
 /** Hard-coded for MVP — the single match the hackathon brief targets. */
 export const MATCH_ID = 'DFL-MAT-000001';

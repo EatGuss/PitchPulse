@@ -2,7 +2,6 @@
  * Me-tab profile — userStats + equipTitle with local fallback.
  */
 
-import { generateClient } from 'aws-amplify/api';
 import type { DemoUserId } from '../data/personas';
 import type { MeProfile } from '../domain/profileTypes';
 import { normalizeLifetimeAccuracy } from '../domain/accuracy';
@@ -10,6 +9,7 @@ import { filterValidUnlockedTitleIds } from '../domain/titleRules';
 import { fetchUserStats } from './leaderboardClient';
 import { isAwsMode } from './config';
 import { EQUIP_TITLE, UNLOCK_HOT_TAKE_HERO } from './operations';
+import { gql } from './session';
 import { notifyLocalTitleUnlock } from './titleUnlockClient';
 import {
   localEquipTitle,
@@ -75,11 +75,7 @@ export async function commitEquipTitle(userId: DemoUserId, titleId: string): Pro
   }
 
   try {
-    const client = generateClient();
-    const res = (await client.graphql({
-      query: EQUIP_TITLE,
-      variables: { userId, titleId },
-    })) as { data?: { equipTitle: boolean }; errors?: Array<{ message: string }> };
+    const res = await gql<{ equipTitle: boolean }>(userId, EQUIP_TITLE, { titleId });
 
     if (res.errors?.length) {
       throw new Error(res.errors[0]!.message);
@@ -113,11 +109,7 @@ export async function commitUnlockHotTakeHero(userId: DemoUserId): Promise<boole
   if (!isAwsMode) return true;
 
   try {
-    const client = generateClient();
-    const res = (await client.graphql({
-      query: UNLOCK_HOT_TAKE_HERO,
-      variables: { userId },
-    })) as { data?: { unlockHotTakeHero: boolean }; errors?: Array<{ message: string }> };
+    const res = await gql<{ unlockHotTakeHero: boolean }>(userId, UNLOCK_HOT_TAKE_HERO);
 
     if (res.errors?.length) {
       throw new Error(res.errors[0]!.message);

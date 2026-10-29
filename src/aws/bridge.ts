@@ -19,25 +19,12 @@
  * tears down the previous subscriptions before opening fresh ones.
  */
 
-import { generateClient } from 'aws-amplify/api';
 import { MATCH_ID, isAwsMode } from './config';
+import { VIEWER, gql, gqlSubscribe, type SessionUser } from './session';
 import { FIRE_REACTION, RESET_MATCH, START_MATCH, SUB_MATCH_CLOCK, SUB_MATCH_EVENT, SUB_ROOM_REACTION } from './operations';
 import { getMatchSim } from '../sim/matchSim';
 import { getWatchRoomEngine, REACTION_EMOJIS, type ReactionEmoji } from '../sim/watchRoomEngine';
 import type { MatchClockState, NormalizedEvent, NormalizedEventType, MatchPhase } from '../domain/types';
-
-/**
- * Local narrowing for AppSync subscription responses. The Amplify v6
- * `client.graphql()` return type is a union (Promise for queries/mutations,
- * Observable for subscriptions). TypeScript can't infer which from a string
- * literal query, so we cast at the call site.
- */
-interface SubscriptionLike<T> {
-  subscribe: (handlers: {
-    next: (value: { data: T }) => void;
-    error?: (err: unknown) => void;
-  }) => { unsubscribe: () => void };
-}
 
 interface MatchClockPayload {
   matchId: string;
@@ -113,19 +100,14 @@ export function attachAwsBridge(): void {
     return;
   }
 
-  const client = generateClient();
   const sim = getMatchSim();
   let clockMsgCount = 0;
   let eventMsgCount = 0;
 
   console.info('[aws-bridge] opening subscriptions for matchId=%s', MATCH_ID);
 
-  const clockObs = client.graphql({
-    query: SUB_MATCH_CLOCK,
-    variables: { matchId: MATCH_ID },
-  }) as unknown as SubscriptionLike<{ matchClock: MatchClockPayload }>;
-  const clockSub = clockObs.subscribe({
-    next: ({ data }) => {
+  const offClock = gqlSubscribe<{ matchClock: MatchClockPayload }>(VIEWER, SUB_MATCH_CLOCK, { matchId: MATCH_ID }, {
+    next: (data) => {
       clockMsgCount += 1;
       if (clockMsgCount <= 3 || clockMsgCount % 10 === 0) {
         console.info('[aws-bridge] clock #%d', clockMsgCount, data?.matchClock);
@@ -138,12 +120,8 @@ export function attachAwsBridge(): void {
     },
   });
 
-  const eventObs = client.graphql({
-    query: SUB_MATCH_EVENT,
-    variables: { matchId: MATCH_ID },
-  }) as unknown as SubscriptionLike<{ matchEvent: MatchEventPayload }>;
-  const eventSub = eventObs.subscribe({
-    next: ({ data }) => {
+  const offEvent = gqlSubscribe<{ matchEvent: MatchEventPayload }>(VIEWER, SUB_MATCH_EVENT, { matchId: MATCH_ID }, {
+    next: (data) => {
       eventMsgCount += 1;
       console.info(
         '[aws-bridge] event #%d type=%s min=%s',
@@ -159,8 +137,7 @@ export function attachAwsBridge(): void {
     },
   });
 
-  unsubscribers.push(() => clockSub.unsubscribe());
-  unsubscribers.push(() => eventSub.unsubscribe());
+  unsubscribers.push(offClock, offEvent);
   attached = true;
   console.info('[aws-bridge] attached — matchClock + matchEvent subscriptions live');
 }
@@ -177,19 +154,16 @@ export function detachAwsBridge(): void {
   attached = false;
 }
 
-/** Fire the server-side match clock. Resolves once the CLOCK row is written. */
+/** Fire the server-side match clock (operator-only). Resolves once the CLOCK row is written. */
 export async function awsStartMatch(): Promise<void> {
-  const client = generateClient();
   console.info('[aws-bridge] calling startMatch mutation for %s', MATCH_ID);
   // Clear local replay state so a fresh kickoff isn't filtered by the
   // injectEvent dedup set from the prior run. The server's start-match Lambda
   // resets its CLOCK / lastEmittedSeq independently.
   getMatchSim().reset();
   try {
-    const res = await client.graphql({
-      query: START_MATCH,
-      variables: { input: { matchId: MATCH_ID } },
-    });
+    const res = await gql('operator', START_MATCH, { input: { matchId: MATCH_ID } });
+    if (res.errors?.length) throw new Error(res.errors[0]!.message);
     console.info('[aws-bridge] startMatch ok', res);
   } catch (err) {
     console.error('[aws-bridge] startMatch FAILED', err);
@@ -197,16 +171,13 @@ export async function awsStartMatch(): Promise<void> {
   }
 }
 
-/** Reset the server-side match timeline without starting playback. */
+/** Reset the server-side match timeline without starting playback (operator-only). */
 export async function awsResetMatch(): Promise<void> {
-  const client = generateClient();
   console.info('[aws-bridge] calling resetMatch mutation for %s', MATCH_ID);
   getMatchSim().reset();
   try {
-    const res = await client.graphql({
-      query: RESET_MATCH,
-      variables: { input: { matchId: MATCH_ID } },
-    });
+    const res = await gql('operator', RESET_MATCH, { input: { matchId: MATCH_ID } });
+    if (res.errors?.length) throw new Error(res.errors[0]!.message);
     console.info('[aws-bridge] resetMatch ok', res);
   } catch (err) {
     console.error('[aws-bridge] resetMatch FAILED', err);
@@ -220,11 +191,9 @@ export async function awsFireReaction(
   userId: string,
   emoji: string,
 ): Promise<void> {
-  const client = generateClient();
-  await client.graphql({
-    query: FIRE_REACTION,
-    variables: { input: { roomId, userId, emoji } },
-  });
+  // Acts as the reacting user; the server checks room membership.
+  const res = await gql(userId as SessionUser, FIRE_REACTION, { input: { roomId, emoji } });
+  if (res.errors?.length) throw new Error(res.errors[0]!.message);
 }
 
 /** Subscribe once per room to room-scoped reactions and inject into the local engine. */
@@ -235,17 +204,11 @@ export function ensureWatchRoomReactionBridge(roomId: string): void {
   reactionBridgeUnsub?.();
   reactionBridgeRoomId = roomId;
 
-  const client = generateClient();
   const engine = getWatchRoomEngine();
-  const obs = client.graphql({
-    query: SUB_ROOM_REACTION,
-    variables: { roomId },
-  }) as unknown as SubscriptionLike<{
+  const off = gqlSubscribe<{
     roomReaction: { userId: string; emoji: string; ts: number; reactionId: string };
-  }>;
-
-  const sub = obs.subscribe({
-    next: ({ data }) => {
+  }>(VIEWER, SUB_ROOM_REACTION, { roomId }, {
+    next: (data) => {
       const r = data?.roomReaction;
       if (!r) return;
       if (!REACTION_EMOJIS.includes(r.emoji as ReactionEmoji)) return;
@@ -257,7 +220,7 @@ export function ensureWatchRoomReactionBridge(roomId: string): void {
   });
 
   reactionBridgeUnsub = () => {
-    sub.unsubscribe();
+    off();
     if (reactionBridgeRoomId === roomId) {
       reactionBridgeRoomId = null;
       reactionBridgeUnsub = null;
