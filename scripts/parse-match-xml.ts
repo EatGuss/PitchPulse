@@ -25,8 +25,15 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
-const EVENTS_XML = resolve(REPO_ROOT, 'data/Match-Events/Events_Anonym.xml');
-const INFO_XML = resolve(REPO_ROOT, 'data/Match-Events/MatchInformations_Anonym.xml');
+// Licensed DFL source (gitignored) — preferred when present.
+const DFL_EVENTS_XML = resolve(REPO_ROOT, 'data/Match-Events/Events_Anonym.xml');
+const DFL_INFO_XML = resolve(REPO_ROOT, 'data/Match-Events/MatchInformations_Anonym.xml');
+// Committed synthetic match (scripts/generate-synthetic-match.ts) — fallback so a
+// fresh clone runs. MATCH_DATA=synthetic forces it even when the DFL files exist.
+const SYN_EVENTS_XML = resolve(REPO_ROOT, 'fixtures/synthetic-match/Events_Synthetic.xml');
+const SYN_INFO_XML = resolve(REPO_ROOT, 'fixtures/synthetic-match/MatchInformations_Synthetic.xml');
+let EVENTS_XML = DFL_EVENTS_XML;
+let INFO_XML = DFL_INFO_XML;
 const OUT_DIR = resolve(REPO_ROOT, 'public');
 const OUT_EVENTS = resolve(OUT_DIR, 'events.json');
 const OUT_INFO = resolve(OUT_DIR, 'match-info.json');
@@ -101,6 +108,7 @@ interface MatchInfo {
   teams: { home: TeamLite; guest: TeamLite };
   totalTimeFirstHalfMs: number;
   totalTimeSecondHalfMs: number;
+  dataSource: 'dfl' | 'synthetic';
 }
 
 // ─── XML parser setup ──────────────────────────────────────────────────────────
@@ -165,6 +173,7 @@ function parseMatchInfo(): MatchInfo {
     teams: { home: toTeam(home), guest: toTeam(guest) },
     totalTimeFirstHalfMs: Number(other['@_TotalTimeFirstHalf'] ?? 0),
     totalTimeSecondHalfMs: Number(other['@_TotalTimeSecondHalf'] ?? 0),
+    dataSource: String(general['@_DataSource'] ?? '') === 'synthetic' ? 'synthetic' : 'dfl',
   };
 }
 
@@ -583,26 +592,17 @@ function parseEvents(): { events: NormalizedEvent[]; firstKickoffIso: string; se
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 function main(): void {
-  // The DFL XML is licensed and gitignored, so a fresh clone has neither the
-  // source nor the derived JSON. Reuse derived files if present; otherwise
-  // stop with instructions instead of a stack trace (predev/prebuild run this).
-  if (!existsSync(EVENTS_XML) || !existsSync(INFO_XML)) {
-    if (existsSync(OUT_EVENTS) && existsSync(OUT_INFO)) {
-      console.log('[parse-match-xml] source XML not found — keeping existing public/*.json');
-      return;
-    }
-    console.error(
-      [
-        '[parse-match-xml] Match data is missing.',
-        '  The app (local AND AWS mode) loads public/events.json and public/match-info.json,',
-        '  which are generated from the DFL hackathon XML. That data is not in git.',
-        '  Copy both files from s3://hackathon-data-058755927272 into data/Match-Events/:',
-        `    ${EVENTS_XML}`,
-        `    ${INFO_XML}`,
-        '  then run `npm run parse` (see README: "How to run locally").',
-      ].join('\n'),
+  // The DFL XML is licensed and gitignored, so a fresh clone does not have it.
+  // Fall back to the committed synthetic match rather than failing predev.
+  const haveDfl = existsSync(DFL_EVENTS_XML) && existsSync(DFL_INFO_XML);
+  if (process.env.MATCH_DATA === 'synthetic' || !haveDfl) {
+    EVENTS_XML = SYN_EVENTS_XML;
+    INFO_XML = SYN_INFO_XML;
+    console.log(
+      `[parse-match-xml] using SYNTHETIC match data (${
+        haveDfl ? 'MATCH_DATA=synthetic' : 'DFL XML not found in data/Match-Events/'
+      })`,
     );
-    process.exit(1);
   }
 
   console.log('[parse-match-xml] reading source XMLs...');

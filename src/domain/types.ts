@@ -78,6 +78,8 @@ export interface MatchInfo {
   teams: { home: TeamLite; guest: TeamLite };
   totalTimeFirstHalfMs: number;
   totalTimeSecondHalfMs: number;
+  /** 'synthetic' when parsed from fixtures/synthetic-match (no DFL data present). */
+  dataSource?: 'dfl' | 'synthetic';
 }
 
 export interface EventsFile {
