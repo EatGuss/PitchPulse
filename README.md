@@ -95,7 +95,7 @@ This section is a **self-service walkthrough** — follow it top to bottom on a 
 | Requirement | Why |
 |---|---|
 | **Node 22+**, `npm install` | Builds the Vite app |
-| **Match replay source** | Deployed stack reads **`s3://hackathon-data-058755927272`** (two XML keys, see [Data & licensing disclosure](#data--licensing-disclosure)); or local parse from a gitignored mirror |
+| **Match replay source** | Nothing to do: without the licensed DFL files, both local mode and `npm run aws:deploy` use the committed synthetic match. With the DFL XML in gitignored `data/Match-Events/` (or `-c matchData=dfl` on the hackathon sandbox) the real match is replayed |
 | **`.env.local`** from `.env.example` | Optional for local-only demo; fill AppSync/Cognito only if you want the AWS-backed sim |
 | **Route `/demo`** | Two phones (Alice left, Bob right), one shared match clock — **required** for Watch Room and Ranked |
 
@@ -281,7 +281,7 @@ The demo password is shared by design (one password signs in all three accounts 
 
 ## How to run locally
 
-**Prereqs:** Node 22+, npm 10+, AWS CLI v2, and a valid AWS SSO profile for the hackathon sandbox account `058755927272`.
+**Prereqs:** Node 22+ and npm 10+. Nothing AWS-related is needed to run locally; for the AWS-backed mode see [How to deploy to AWS](#how-to-deploy-to-aws).
 
 ```bash
 git clone <repo>
@@ -351,48 +351,39 @@ The challenge brief explicitly allows "a local running app with API calls to AWS
 
 ## How to deploy to AWS
 
-**Prereqs:** all local prereqs, plus CDK bootstrapped once per account/region.
+You need an AWS account and credentials on your machine (`aws configure`, `aws sso login`, or the usual `AWS_*` environment variables), plus Node 22+. No Docker, no AWS CLI, no access to the hackathon bucket and no manual setup in the console.
 
 ```bash
-# Bootstrap once (one-time per account/region):
-cd cdk
-npx cdk bootstrap aws://058755927272/eu-central-1 \
-  --profile <YOUR_ISB_PROFILE>
-```
-
-### Deploy the stack
-
-Set the shared demo password first (at least 12 characters). It lives only in SSM; a deploy-time custom resource applies it to the `alice`, `bob` and `operator` accounts, and it is never written to the template, the outputs or the frontend bundle:
-
-```bash
-aws ssm put-parameter --name /pitchpulse/demo-password --type SecureString \
-  --value '<demo password>' --profile <YOUR_ISB_PROFILE>
-```
-
-To rotate it, update the parameter and redeploy. Use a different parameter name with `-c demoPasswordParam=/your/name`.
-
-```bash
-cd cdk
 npm install
-npx cdk deploy --require-approval never \
-  --profile <YOUR_ISB_PROFILE> \
-  --outputs-file cdk-outputs.json
+npm run aws:deploy
 ```
 
-Copy outputs into the repo-root `.env.local`:
+That one command:
 
-```bash
-VITE_APPSYNC_URL=https://<id>.appsync-api.eu-central-1.amazonaws.com/graphql
-VITE_APPSYNC_REGION=eu-central-1
-VITE_COGNITO_USER_POOL_CLIENT_ID=<UserPoolClientId output>
-```
+1. checks your credentials and stops with instructions if there are none;
+2. bootstraps CDK in your account/region (safe to repeat);
+3. deploys the stack — by default it creates its own bucket and uploads the committed **synthetic match**, so it works in any account;
+4. writes `VITE_APPSYNC_URL`, `VITE_APPSYNC_REGION` and `VITE_COGNITO_USER_POOL_CLIENT_ID` into `.env.local` (other lines are kept);
+5. prints the **demo password**, which the stack generated into Secrets Manager.
 
-Restart `npm run dev` and sign in with the demo password. A healthy AWS session logs:
+Then run `npm run dev`, open `http://127.0.0.1:5173/demo` and sign in with that password. A healthy AWS session logs:
 
 ```
 [amplify] configured for AppSync @ https://...
 [aws-bridge] attached — matchClock + matchEvent subscriptions live
 ```
+
+Region: your configured AWS region, or `eu-central-1` if none is set. Extra arguments go to `cdk deploy`, e.g. `npm run aws:deploy -- -c matchData=dfl` to replay the licensed DFL file from the hackathon bucket (only the hackathon sandbox account can read it).
+
+**Cost:** everything is pay-per-request (DynamoDB on-demand, Lambda, AppSync, Cognito) and costs very little for a demo session, plus about $0.40/month for the Secrets Manager secret while the stack exists. Remove everything with:
+
+```bash
+npm run aws:destroy
+```
+
+That deletes the stack (bucket, tables, user pool, secret) and switches `.env.local` back to local mode.
+
+**What has and hasn't been verified:** the stack is checked offline — `npm run verify:deploy` synthesizes it for a non-sandbox account and asserts what a fresh account needs, and the synthesized template passes `cfn-lint` with no errors. It has **not** been deployed to a live account since these changes, so the first real deploy is the end-to-end test; please report anything that fails.
 
 ### Faster iteration
 
