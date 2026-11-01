@@ -1,7 +1,9 @@
 /**
  * sim-emitter — drives match-time progression for a single match instance.
  *
- * Invocation sources (both supported, both safe to run concurrently):
+ * Invocation sources (both supported, both safe to run concurrently — a
+ * DynamoDB lease (EMITTER_LEASE row) lets only one invocation run the loop;
+ * the others exit at once):
  *   1. EventBridge rate(1 minute) cron rule — safety net; ensures the loop
  *      restarts if a prior invocation died with an unhandled exception.
  *   2. Direct Lambda Invoke (Event invocation type) from start-match — for
@@ -34,12 +36,16 @@
 
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
+  ConditionalCheckFailedException,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
   BatchWriteItemCommand,
+  UpdateItemCommand,
   type AttributeValue,
 } from '@aws-sdk/client-dynamodb';
+import type { Context } from 'aws-lambda';
+import { randomUUID } from 'node:crypto';
 import {
   formatDisplayClock,
   parseMatchXmlBundle,
@@ -52,7 +58,7 @@ import {
 // ─── Config (from env) ─────────────────────────────────────────────────────
 
 const REGION = process.env.AWS_REGION ?? 'eu-central-1';
-const DATA_BUCKET = required('HACKATHON_DATA_BUCKET');
+const DATA_BUCKET = required('MATCH_DATA_BUCKET');
 const EVENTS_KEY = required('MATCH_EVENTS_KEY');
 const INFO_KEY = required('MATCH_INFO_KEY');
 const MATCHES_TABLE = required('MATCHES_TABLE');
@@ -436,7 +442,72 @@ function sleep(ms: number): Promise<void> {
 const LOOP_MAX_MS = 220_000;
 const TICK_INTERVAL_MS = 2_000;
 
-export const handler = async (): Promise<void> => {
+// ─── Single-emitter lease ──────────────────────────────────────────────────
+// start-match's direct invoke and the 1-minute cron can overlap; two loops
+// would read the same lastEmittedSeq and double-emit. A conditional write on
+// one lease row admits a single owner. It outlives the Lambda timeout (240 s)
+// so a crashed loop's lease expires and the next cron tick takes over.
+
+const LEASE_MS = LOOP_MAX_MS + 30_000;
+
+function leaseKey(): Record<string, AttributeValue> {
+  return { PK: { S: `MATCH#${MATCH_ID}` }, SK: { S: 'EMITTER_LEASE' } };
+}
+
+export async function acquireLease(owner: string, now = Date.now()): Promise<boolean> {
+  try {
+    await ddb.send(
+      new UpdateItemCommand({
+        TableName: MATCHES_TABLE,
+        Key: leaseKey(),
+        UpdateExpression: 'SET leaseOwner = :o, leaseUntil = :u',
+        ConditionExpression:
+          'attribute_not_exists(leaseUntil) OR leaseUntil < :now OR leaseOwner = :o',
+        ExpressionAttributeValues: {
+          ':o': { S: owner },
+          ':u': { N: String(now + LEASE_MS) },
+          ':now': { N: String(now) },
+        },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) return false;
+    throw err;
+  }
+}
+
+async function releaseLease(owner: string): Promise<void> {
+  try {
+    await ddb.send(
+      new UpdateItemCommand({
+        TableName: MATCHES_TABLE,
+        Key: leaseKey(),
+        UpdateExpression: 'SET leaseUntil = :zero',
+        ConditionExpression: 'leaseOwner = :o',
+        ExpressionAttributeValues: { ':o': { S: owner }, ':zero': { N: '0' } },
+      }),
+    );
+  } catch (err) {
+    // Lost the lease already (expired and taken over) — nothing to release.
+    if (!(err instanceof ConditionalCheckFailedException)) throw err;
+  }
+}
+
+export const handler = async (_event?: unknown, context?: Context): Promise<void> => {
+  const owner = context?.awsRequestId ?? randomUUID();
+  if (!(await acquireLease(owner))) {
+    console.log(JSON.stringify({ msg: 'sim-emitter: another invocation holds the lease; exiting' }));
+    return;
+  }
+  try {
+    await runLoop();
+  } finally {
+    await releaseLease(owner);
+  }
+};
+
+async function runLoop(): Promise<void> {
   const match = await loadMatch();
   const startedAt = Date.now();
   let firstTick = true;
@@ -457,4 +528,4 @@ export const handler = async (): Promise<void> => {
     }
   }
   console.log(JSON.stringify({ msg: 'sim-emitter: loop exit (LOOP_MAX_MS reached)' }));
-};
+}
