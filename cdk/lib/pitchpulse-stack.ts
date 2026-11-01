@@ -24,15 +24,17 @@
  *
  *   Cognito
  *     User Pool with the demo accounts alice, bob and operator (group
- *     "operators"), sharing one password read from SSM at deploy time.
+ *     "operators"), sharing one password that the stack generates into
+ *     Secrets Manager at deploy time (npm run aws:deploy prints it).
  *     Clients call AppSync with an ID token via the AWS_LAMBDA authorizer;
  *     there is no anonymous access. Server Lambdas use IAM.
  *
- * Hackathon-data S3 bucket access:
- *   The sim-emitter Lambda reads two specific objects out of the existing
- *   hackathon-data-058755927272 bucket on cold start. The bucket itself is
- *   NOT managed by this stack — we attach a read-only policy scoped to the
- *   two keys only.
+ * Match data (context `matchData`):
+ *   synthetic (default) — the stack creates its own bucket and uploads the
+ *     committed fixtures/synthetic-match XML, so any AWS account can deploy.
+ *   dfl — the sim reads the licensed XML from the hackathon bucket
+ *     hackathon-data-058755927272, which only the hackathon sandbox account
+ *     can read (cdk deploy -c matchData=dfl).
  */
 
 import * as path from 'node:path';
@@ -55,19 +57,21 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cr from 'aws-cdk-lib/custom-resources';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { CustomResource } from 'aws-cdk-lib';
 
-// ─── Hackathon constants ───────────────────────────────────────────────────
+// ─── Match data sources ────────────────────────────────────────────────────
 
 const HACKATHON_DATA_BUCKET = 'hackathon-data-058755927272';
 // NB: matches the actual S3 layout discovered in Gate 0 (note the en-dash in
 // "Challenge 3 – ..."). Anchored in .env.example for consistency.
-const MATCH_EVENTS_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/Events_Anonym.xml';
-const MATCH_INFO_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/MatchInformations_Anonym.xml';
+const DFL_EVENTS_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/Events_Anonym.xml';
+const DFL_INFO_KEY = 'Challenge 3 – A Real Time Social Match Experience/data/Match-Events/MatchInformations_Anonym.xml';
+const SYNTHETIC_PREFIX = 'synthetic-match/';
 const MATCH_ID = 'DFL-MAT-000001';
 const SEASON_WEEKS = '8';
-/** SSM SecureString holding the shared demo password. Create it before deploying. */
-const DEFAULT_DEMO_PASSWORD_PARAM = '/pitchpulse/demo-password';
 const OPERATORS_GROUP = 'operators';
 const DEMO_USERS = [
   { username: 'alice', name: 'Alice', groups: [] as string[] },
@@ -139,15 +143,22 @@ export class PitchPulseStack extends Stack {
     // Shared NodejsFunction defaults: Node 20, ESM-friendly bundle, tight
     // log retention (cost), short timeout where possible.
     const fnDefaults: Partial<lambdaNodejs.NodejsFunctionProps> = {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      // Node 20 was deprecated 2026-04-30; 24 is the current LTS runtime.
+      runtime: lambda.Runtime.NODEJS_24_X,
       architecture: lambda.Architecture.ARM_64,
       bundling: {
         minify: true,
         sourceMap: false,
-        target: 'node20',
+        target: 'node24',
         externalModules: ['@aws-sdk/*'], // SDK v3 is provided by the runtime
       },
     };
+
+    // Where the sim reads the match XML from (see header comment).
+    const matchData = (this.node.tryGetContext('matchData') as string | undefined) ?? 'synthetic';
+    if (matchData !== 'synthetic' && matchData !== 'dfl') {
+      throw new Error(`Unknown -c matchData=${matchData}; use synthetic or dfl`);
+    }
 
     const simEmitterFn = new lambdaNodejs.NodejsFunction(this, 'SimEmitterFn', {
       ...fnDefaults,
@@ -159,36 +170,48 @@ export class PitchPulseStack extends Stack {
       // avoids any visible gap between Lambda exits and EventBridge re-fires.
       timeout: Duration.seconds(240),
       memorySize: 512,
-      // Pin to exactly 1 concurrent invocation. Without this, the manual
-      // invoke triggered by start-match races the EventBridge 1-minute
-      // safety-net cron — both Lambdas read the same lastEmittedSeq from
-      // CLOCK and re-emit the same events with different emittedAt
-      // timestamps, which the frontend then has to dedupe. Reserving 1
-      // serializes everything; queued cron invokes simply run once the
-      // current handler finishes (~55s loop).
-      reservedConcurrentExecutions: 1,
+      // One emitter at a time is enforced by a DynamoDB lease inside the
+      // handler, not reservedConcurrentExecutions: reserving concurrency is
+      // rejected on new accounts whose concurrency limit is 10.
       environment: {
-        HACKATHON_DATA_BUCKET,
-        MATCH_EVENTS_KEY,
-        MATCH_INFO_KEY,
         MATCHES_TABLE: matchesTable.tableName,
         MATCH_ID,
         SIM_RATE: '30',
       },
     });
     matchesTable.grantReadWriteData(simEmitterFn);
-    // s3:GetObject scoped to the Match-Events folder. IAM policy documents
-    // reject non-ASCII bytes, and the actual S3 keys contain a UTF-8 en-dash
-    // (in "Challenge 3 – ..."), so we use an ASCII wildcard prefix here
-    // instead of listing the two specific keys. Both file names are passed
-    // to the Lambda via environment variables, so the runtime still reads
-    // only those two objects.
-    simEmitterFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['s3:GetObject'],
-        resources: [`arn:aws:s3:::${HACKATHON_DATA_BUCKET}/*`],
-      }),
-    );
+
+    if (matchData === 'dfl') {
+      simEmitterFn.addEnvironment('MATCH_DATA_BUCKET', HACKATHON_DATA_BUCKET);
+      simEmitterFn.addEnvironment('MATCH_EVENTS_KEY', DFL_EVENTS_KEY);
+      simEmitterFn.addEnvironment('MATCH_INFO_KEY', DFL_INFO_KEY);
+      // s3:GetObject scoped to the bucket. IAM policy documents reject
+      // non-ASCII bytes, and the actual S3 keys contain a UTF-8 en-dash (in
+      // "Challenge 3 – ..."), so we cannot list the two keys exactly.
+      simEmitterFn.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['s3:GetObject'],
+          resources: [`arn:aws:s3:::${HACKATHON_DATA_BUCKET}/*`],
+        }),
+      );
+    } else {
+      const matchDataBucket = new s3.Bucket(this, 'MatchDataBucket', {
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+        enforceSSL: true,
+        removalPolicy: RemovalPolicy.DESTROY,
+        autoDeleteObjects: true,
+      });
+      const upload = new s3deploy.BucketDeployment(this, 'SyntheticMatchData', {
+        sources: [s3deploy.Source.asset(path.join(REPO_ROOT, 'fixtures', 'synthetic-match'))],
+        destinationBucket: matchDataBucket,
+        destinationKeyPrefix: SYNTHETIC_PREFIX,
+      });
+      matchDataBucket.grantRead(simEmitterFn);
+      simEmitterFn.node.addDependency(upload);
+      simEmitterFn.addEnvironment('MATCH_DATA_BUCKET', matchDataBucket.bucketName);
+      simEmitterFn.addEnvironment('MATCH_EVENTS_KEY', `${SYNTHETIC_PREFIX}Events_Synthetic.xml`);
+      simEmitterFn.addEnvironment('MATCH_INFO_KEY', `${SYNTHETIC_PREFIX}MatchInformations_Synthetic.xml`);
+    }
 
     const startMatchFn = new lambdaNodejs.NodejsFunction(this, 'StartMatchFn', {
       ...fnDefaults,
@@ -329,15 +352,21 @@ export class PitchPulseStack extends Stack {
       idTokenValidity: Duration.hours(1),
       refreshTokenValidity: Duration.days(1),
     });
-    new cognito.CfnUserPoolGroup(this, 'OperatorsGroup', {
+    const operatorsGroup = new cognito.CfnUserPoolGroup(this, 'OperatorsGroup', {
       userPoolId: userPool.userPoolId,
       groupName: OPERATORS_GROUP,
       description: 'May start and reset the shared match clock.',
     });
 
-    const demoPasswordParam =
-      (this.node.tryGetContext('demoPasswordParam') as string | undefined) ??
-      DEFAULT_DEMO_PASSWORD_PARAM;
+    // Shared demo password, generated at deploy time. Never in the template,
+    // outputs or bundle; npm run aws:deploy reads it back and prints it.
+    // No fixed secretName: Secrets Manager keeps deleted names reserved for
+    // up to 30 days, which would break a destroy-then-redeploy.
+    const demoPassword = new secretsmanager.Secret(this, 'DemoPassword', {
+      description: 'PitchPulse shared demo password for alice, bob and operator.',
+      generateSecretString: { passwordLength: 20, excludePunctuation: true },
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
 
     const demoUsersFn = new lambdaNodejs.NodejsFunction(this, 'DemoUsersFn', {
       ...fnDefaults,
@@ -358,26 +387,20 @@ export class PitchPulseStack extends Stack {
         resources: [userPool.userPoolArn],
       }),
     );
-    demoUsersFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['ssm:GetParameter'],
-        resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/${demoPasswordParam.replace(/^\//, '')}`,
-        ],
-      }),
-    );
+    demoPassword.grantRead(demoUsersFn);
     const demoUsers = new CustomResource(this, 'DemoUsers', {
       serviceToken: new cr.Provider(this, 'DemoUsersProvider', { onEventHandler: demoUsersFn })
         .serviceToken,
       properties: {
         UserPoolId: userPool.userPoolId,
-        PasswordParameterName: demoPasswordParam,
+        PasswordSecretArn: demoPassword.secretArn,
         Users: JSON.stringify(DEMO_USERS),
-        // Re-run on every deploy so a rotated SSM value takes effect.
+        // Re-run on every deploy so a rotated secret value takes effect.
         Nonce: Date.now().toString(),
       },
     });
-    demoUsers.node.addDependency(userPool);
+    // AdminAddUserToGroup fails if the group does not exist yet.
+    demoUsers.node.addDependency(userPool, operatorsGroup);
 
     const authorizerFn = new lambdaNodejs.NodejsFunction(this, 'AuthorizerFn', {
       ...fnDefaults,
@@ -616,20 +639,17 @@ export class PitchPulseStack extends Stack {
       value: api.graphqlUrl,
       description: 'AppSync GraphQL endpoint URL (HTTPS for mutations/queries).',
     });
-    new CfnOutput(this, 'AppSyncRealtimeUrl', {
-      value: api.graphqlUrl.replace('https://', 'wss://').replace('appsync-api', 'appsync-realtime-api'),
-      description: 'AppSync real-time (WebSocket) URL - derived; Amplify infers this automatically.',
-    });
     new CfnOutput(this, 'AppSyncApiId', { value: api.apiId });
     new CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', {
       value: userPoolClient.userPoolClientId,
       description: 'Frontend VITE_COGNITO_USER_POOL_CLIENT_ID.',
     });
-    new CfnOutput(this, 'DemoPasswordParameter', {
-      value: demoPasswordParam,
-      description: 'SSM SecureString with the shared demo password (set by the deployer).',
+    new CfnOutput(this, 'DemoPasswordSecretArn', {
+      value: demoPassword.secretArn,
+      description: 'Secrets Manager secret holding the shared demo password.',
     });
+    new CfnOutput(this, 'MatchData', { value: matchData });
     new CfnOutput(this, 'Region', { value: this.region });
     new CfnOutput(this, 'MatchId', { value: MATCH_ID });
     new CfnOutput(this, 'SeasonWeeks', { value: SEASON_WEEKS });
