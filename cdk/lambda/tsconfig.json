@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node", "aws-lambda"]
   },
-  "include": ["**/*.ts", "../test/**/*.ts"]
+  "include": ["**/*.ts", "../test/**/*.ts", "../scripts/**/*.ts"]
 }
